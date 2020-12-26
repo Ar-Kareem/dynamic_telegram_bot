@@ -40,8 +40,7 @@ class Subscriber:
         # the one that chooses the name this design is by choice and it could be the other way around but I prefer
         # this way since it is more explicit to the subscriber who dispatched the event
         custom_notifier = partial(self._new_upload, uploader_name=str(uploader_name))
-        # noinspection PyProtectedMember
-        uploader._add_subscriber(custom_notifier)
+        uploader._add_to_notify_list(custom_notifier)
 
     def check_feed_for(self, uploader_name: str) -> bool:
         """Checks whether the feed contains an upload from a specific uploader"""
@@ -50,17 +49,12 @@ class Subscriber:
                 return True
         return False
 
-    def _clear(self) -> None:
-        """Clears the internal feed"""
-        with self._condmutex:
-            self._feed.clear()
-
 
 class Uploader:
     def __init__(self):
         self._subscriber_notifiers: List[Callable[[Any], None]] = []
 
-    def _add_subscriber(self, notifier: Callable[[Any], None]) -> None:
+    def _add_to_notify_list(self, notifier: Callable[[Any], None]) -> None:
         self._subscriber_notifiers.append(notifier)
 
     def dispatch(self, obj: Any = None) -> None:
@@ -68,54 +62,58 @@ class Uploader:
             subscriber_notifier(obj)
 
 
-class AffiliateManager:
-    _Affiliates = NamedTuple('Affiliates',
-                             [('uploaders', List[Uploader]),
-                              ('subscribers', List[Subscriber]),
-                              ('manager', Uploader)])
+class Store:
+    _Subject = NamedTuple('Affiliates',
+                             [('manager', Uploader),
+                              ('history', List[Event]),
+                              ('lock', threading.Lock)])
 
     def __init__(self):
-        self._store = dict()
+        self._store: dict[str, Store._Subject] = dict()
         self._lock = threading.Lock()
 
     def _add_subject_to_store(self, subject_name: str) -> None:
         if subject_name in self._store:
             return
-        manager = Uploader()  # this is in case the AffiliateManager wanted to push to a subject by itself
-        self._store[subject_name] = AffiliateManager._Affiliates(uploaders=[], subscribers=[], manager=manager)
+        with self._lock:
+            if subject_name not in self._store:
+                manager = Uploader()
+                self._store[subject_name] = Store._Subject(manager=manager, history=[], lock=threading.Lock())
 
-    def bind_subscribe_to_subject(self, subject_name: str, subscriber: Subscriber) -> None:
+    def bind_subscribe_to_subject(self, subject_name: str, subscriber: Subscriber, ignore_old: bool = False) -> None:
         """Make a subscriber get notified whenever an event is dispatched to this subject."""
         subject_name = str(subject_name)
-        with self._lock:
-            self._add_subject_to_store(subject_name)  # make sure subject already in store
-            affiliates = self._store[subject_name]
-            affiliates.subscribers.append(subscriber)  # register as new subscriber to subject
-            # notify every uploader to start notifying subscriber
-            for uploader in affiliates.uploaders:
-                subscriber.subscribe_to(uploader, uploader_name=subject_name)
-            subscriber.subscribe_to(affiliates.manager, uploader_name=subject_name)
-
-    def get_subscriber_for(self, subject_name: str) -> Subscriber:
-        """Creates and Returns a new subscriber that is subscriber to the specified subject"""
-        new_subscriber = Subscriber()
-        self.bind_subscribe_to_subject(subject_name, new_subscriber)
-        return new_subscriber
+        self._add_subject_to_store(subject_name)  # make sure subject already in store
+        subject = self._store[subject_name]
+        with subject.lock:  # lock for editing subject
+            manager = subject.manager
+            subscriber.subscribe_to(manager, uploader_name=subject_name)
+            if not ignore_old:
+                for data in subject.history:
+                    subscriber._new_upload(data, subject_name)
 
     def bind_uploader_to_subject(self, subject_name: str, uploader: Uploader) -> None:
         """Make a all dispatches from this uploader go to the subscribers of the given subject."""
         subject_name = str(subject_name)
-        with self._lock:
-            self._add_subject_to_store(subject_name)  # make sure subject already in store
-            affiliates = self._store[subject_name]
-            affiliates.uploaders.append(uploader)  # register as new uploader to subject
-            # notify every subscriber to start listening uploader
-            for subscriber in affiliates.subscribers:
-                subscriber.subscribe_to(uploader, uploader_name=subject_name)
+        self._add_subject_to_store(subject_name)  # make sure subject already in store
+
+        # uploader will call dispatch_to with the proper subject name and the subject manager will take care of the rest
+        def subject_notifier(obj=None):
+            return self.dispatch_to(subject_name=subject_name, obj=obj)
+        uploader._add_to_notify_list(subject_notifier)
 
     def dispatch_to(self, subject_name: str, obj: Any = None) -> None:
         """Dispatch an event to all subscribers of a given subject"""
         subject_name = str(subject_name)
-        if subject_name not in self._store:
-            return
-        self._store[subject_name].manager.dispatch(obj)
+        self._add_subject_to_store(subject_name)  # make sure subject already in store
+        subject = self._store[subject_name]
+        with subject.lock:  # lock for editing subject
+            subject.manager.dispatch(obj)
+            subject.history.append(obj)
+
+    def get_subscriber_for(self, subject_name: str) -> Subscriber:
+        """Creates and Returns a new subscriber that is subscribed to the specified subject"""
+        subject_name = str(subject_name)
+        new_subscriber = Subscriber()
+        self.bind_subscribe_to_subject(subject_name, new_subscriber)
+        return new_subscriber

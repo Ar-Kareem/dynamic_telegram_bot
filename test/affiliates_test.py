@@ -2,7 +2,7 @@ import unittest
 import time
 import threading
 import guppy
-from utils.affiliates import AffiliateManager, Subscriber, Uploader
+from utils.affiliates import Store, Subscriber, Uploader
 
 
 def uploader_thread(uploader, num, manager):
@@ -22,11 +22,7 @@ def uploader_thread(uploader, num, manager):
 # (total of 0.5 mill dispatches and 8 mill receives)
 # 6 minutes
 
-dispatch_count = int(10_000)
-
-
 def subscriber_thread(subscriber, code, manager):
-    manager.bind_subscribe_to_subject(subject_name='halt_event', subscriber=subscriber)
     start_flag = Subscriber()
     manager.bind_subscribe_to_subject(subject_name='start_flag_consume', subscriber=start_flag)
 
@@ -36,6 +32,7 @@ def subscriber_thread(subscriber, code, manager):
         if binary[i] == '1':
             manager.bind_subscribe_to_subject(subject_name=i + 1, subscriber=subscriber)
             expected += dispatch_count * (i + 1)
+    manager.bind_subscribe_to_subject(subject_name='halt_event', subscriber=subscriber)
     print(f'code {code} ready and expecting {expected}')
     start_flag.consume()  # wait for main thread to signal go
     while True:
@@ -44,10 +41,10 @@ def subscriber_thread(subscriber, code, manager):
             continue
         if e.uploader_name == 'halt_event':  # or subscriber.check_feed_for('halt_event'):
             break
-        # expected -= e.data
-    expected = 0
+        expected -= e.data
     if expected != 0:
         print(f'\n !!!!!!!! code {code} ended up with {expected}')
+        assert False
     else:
         print('ok ', end='')
 
@@ -83,24 +80,25 @@ def main(a, b, c, d):
     # inspect.daemon = True
     # inspect.start()
 
-    for i in range(max(len(threads1), len(threads2))):
-        if i < len(threads1):
-            threads1[i].start()
-        if i < len(threads2):
-            threads2[i].start()
-
-    time.sleep(0.25)
-    print('starting')
-
     manager.dispatch_to(subject_name='start_flag_upload')
-    time.sleep(1)
-    print('uploaders finished, main thread halting')
-    manager.dispatch_to(subject_name='halt_event')
+    manager.dispatch_to(subject_name='start_flag_consume')
+
+    # for i in range(max(len(threads1), len(threads2))):
+    #     if i < len(threads1):
+    #         threads1[i].start()
+    #     if i < len(threads2):
+    #         threads2[i].start()
+    for i in threads2:
+        i.start()
+    for i in threads1:
+        i.start()
+
 
     for t in threads2:
         t.join()
 
-    manager.dispatch_to(subject_name='start_flag_consume')
+    print('uploaders finished, main thread halting')
+    manager.dispatch_to(subject_name='halt_event')
 
     for t in threads1:
         t.join()
@@ -108,14 +106,17 @@ def main(a, b, c, d):
     print("\nthread finished...exiting")
 
 
+dispatch_count = int(100_000)
+
+
 class MyTestCase(unittest.TestCase):
     def test_something(self):
         hp = guppy.hpy()
         hp.setrelheap()
 
-        main_manager = AffiliateManager()
+        main_manager = Store()
         garbage = []
-        for _ in range(2):
+        for _ in range(1):
             print('\n\n\n IN MAIN LOOP', _, ' \n\n\n')
             garbage.append(main_manager._store)
             main_manager._store = dict()
@@ -127,4 +128,3 @@ class MyTestCase(unittest.TestCase):
         print(hp.heap())
         print(hp.heap().byid[0].sp)
 
-        self.assertEqual(True, True)
