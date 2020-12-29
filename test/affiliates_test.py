@@ -2,46 +2,74 @@ import unittest
 import time
 import threading
 import guppy
-from utils.affiliates import Store, Subscriber, Uploader
+from utils.affiliates import Store, Subscriber, BaseAction
 
 
-def uploader_thread(uploader, num, manager):
-    start_flag = Subscriber()
-    manager.bind_subscribe_to_subject(subject_name='start_flag_upload', subscriber=start_flag)
-    manager.bind_uploader_to_subject(subject_name=num, uploader=uploader)
+class val1(BaseAction):
+    name = '[BaseAction] val1'
+    payload = 1
+class val2(BaseAction):
+    name = '[BaseAction] val2'
+    payload = 2
+class val3(BaseAction):
+    name = '[BaseAction] val3'
+    payload = 3
+class val4(BaseAction):
+    name = '[BaseAction] val4'
+    payload = 4
+class val5(BaseAction):
+    name = '[BaseAction] val5'
+    payload = 5
+action_list = [val1, val2, val3, val4, val5]
+
+
+class start_flag_upload(BaseAction):
+    name = '[BaseAction] start_flag_upload'
+class start_flag_consume(BaseAction):
+    name = '[BaseAction] start_flag_consume'
+class stop_flag(BaseAction):
+    name = '[BaseAction] stop_flag'
+
+
+def uploader_thread(store: Store, num: int):
+    start_flag = store.get_new_subscriber()
+    start_flag.subscribe_to(start_flag_upload, include_history=True)
+
+    action_to_dispatch = action_list[num]
+
     print(f'code {num} ready to give out {int(dispatch_count / 2)}')
     start_flag.consume()  # wait for main thread to signal go
     for _ in range(int(dispatch_count / 2)):
-        uploader.dispatch(num)
+        store.dispatch(action_to_dispatch())
 
 
-# 5 topics with a total of 80 subscriptions
+# 5 topics with a total of 80 subscriptions between 32 subscribers
 # each topic has two uploaders
 # each uploader uploads 50k events to its topic
 # (thus each subscription to a topic will get you 100k events)
 # (total of 0.5 mill dispatches and 8 mill receives)
 # 6 minutes
 
-def subscriber_thread(subscriber, code, manager):
-    start_flag = Subscriber()
-    manager.bind_subscribe_to_subject(subject_name='start_flag_consume', subscriber=start_flag)
-
+def subscriber_thread(store, code):
+    start_flag = store.get_new_subscriber()
+    start_flag.subscribe_to(start_flag_consume, include_history=True)
+    me: Subscriber = store.get_new_subscriber()
     binary = bin(code)[2:][::-1]
     expected = 0
     for i in range(len(binary)):
         if binary[i] == '1':
-            manager.bind_subscribe_to_subject(subject_name=i + 1, subscriber=subscriber)
+            me.subscribe_to(action_list[i], include_history=True)
             expected += dispatch_count * (i + 1)
-    manager.bind_subscribe_to_subject(subject_name='halt_event', subscriber=subscriber)
+    me.subscribe_to(stop_flag, include_history=True)
     print(f'code {code} ready and expecting {expected}')
     start_flag.consume()  # wait for main thread to signal go
     while True:
-        e = subscriber.consume()
+        e = me.consume()
         if e is None:
             continue
-        if e.uploader_name == 'halt_event':  # or subscriber.check_feed_for('halt_event'):
+        if isinstance(e, stop_flag):  # or subscriber.check_feed_for('halt_event'):
             break
-        expected -= e.data
+        expected -= e.payload
     if expected != 0:
         print(f'\n !!!!!!!! code {code} ended up with {expected}')
         assert False
@@ -56,32 +84,28 @@ def inspector(subscribers):
         print(f' [{t}] ', end='', flush=True)
 
 
-def main(a, b, c, d):
-    manager = a
-    uploader_set1 = b
-    uploader_set2 = c
-    subscribers = d
-
+def main(store, sub_count, uploader_count):
     threads1 = []
     threads2 = []
 
-    for i, u in enumerate(subscribers):
-        t = threading.Thread(target=subscriber_thread, args=(u, i, manager))
+    for i in range(sub_count):
+        t = threading.Thread(target=subscriber_thread, args=(store, i))
         threads1 += [t]
 
-    for i, u in enumerate(uploader_set1):
-        t = threading.Thread(target=uploader_thread, args=(u, i + 1, manager))
+    for i in range(uploader_count):
+        t = threading.Thread(target=uploader_thread, args=(store, i))
         threads2 += [t]
-    for i, u in enumerate(uploader_set2):
-        t = threading.Thread(target=uploader_thread, args=(u, i + 1, manager))
+    for i in range(uploader_count):
+        t = threading.Thread(target=uploader_thread, args=(store, i))
         threads2 += [t]
 
     # inspect = threading.Thread(target = inspector, args = (subscribers, ))
     # inspect.daemon = True
     # inspect.start()
 
-    manager.dispatch_to(subject_name='start_flag_upload')
-    manager.dispatch_to(subject_name='start_flag_consume')
+    # store.dispatch(start_flag_consume)
+    store.dispatch(start_flag_upload())
+    store.dispatch(start_flag_consume())
 
     # for i in range(max(len(threads1), len(threads2))):
     #     if i < len(threads1):
@@ -98,12 +122,13 @@ def main(a, b, c, d):
         t.join()
 
     print('uploaders finished, main thread halting')
-    manager.dispatch_to(subject_name='halt_event')
+    store.dispatch(stop_flag())
 
     for t in threads1:
         t.join()
 
     print("\nthread finished...exiting")
+
 
 
 dispatch_count = int(100_000)
@@ -114,17 +139,13 @@ class MyTestCase(unittest.TestCase):
         hp = guppy.hpy()
         hp.setrelheap()
 
-        main_manager = Store()
+        store = Store()
         garbage = []
         for _ in range(1):
             print('\n\n\n IN MAIN LOOP', _, ' \n\n\n')
-            garbage.append(main_manager._store)
-            main_manager._store = dict()
-            uploader_set1_ = [Uploader() for _ in range(5)]
-            uploader_set2_ = [Uploader() for _ in range(5)]
-            subscribers_ = [Subscriber() for _ in range(32)]
-            main(main_manager, uploader_set1_, uploader_set2_, subscribers_)
-
+            # garbage.append(store._store)
+            main(store, sub_count=32, uploader_count=5)
+            # store._store = dict()
         print(hp.heap())
         print(hp.heap().byid[0].sp)
 
