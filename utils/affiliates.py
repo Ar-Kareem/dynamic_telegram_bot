@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import threading
 from functools import partial
-from typing import List, Any, NamedTuple, Callable
+from typing import List, Any, NamedTuple, Callable, Union, Iterable
+from collections.abc import Iterable as Iterable_abc
 
 
 Event = NamedTuple('Event', [('data', Any), ('uploader_name', str)])
@@ -64,9 +65,9 @@ class Uploader:
 
 class Store:
     _Subject = NamedTuple('Affiliates',
-                             [('manager', Uploader),
-                              ('history', List[Event]),
-                              ('lock', threading.Lock)])
+                          [('manager', Uploader),
+                           ('history', List[Event]),
+                           ('lock', threading.Lock)])
 
     def __init__(self):
         self._store: dict[str, Store._Subject] = dict()
@@ -80,7 +81,7 @@ class Store:
                 manager = Uploader()
                 self._store[subject_name] = Store._Subject(manager=manager, history=[], lock=threading.Lock())
 
-    def bind_subscribe_to_subject(self, subject_name: str, subscriber: Subscriber, ignore_old: bool = False) -> None:
+    def bind_subscribe_to_subject(self, subject_name: str, subscriber: Subscriber, include_history: bool = True) -> None:
         """Make a subscriber get notified whenever an event is dispatched to this subject."""
         subject_name = str(subject_name)
         self._add_subject_to_store(subject_name)  # make sure subject already in store
@@ -88,7 +89,7 @@ class Store:
         with subject.lock:  # lock for editing subject
             manager = subject.manager
             subscriber.subscribe_to(manager, uploader_name=subject_name)
-            if not ignore_old:
+            if include_history:
                 for data in subject.history:
                     subscriber._new_upload(data, subject_name)
 
@@ -100,6 +101,7 @@ class Store:
         # uploader will call dispatch_to with the proper subject name and the subject manager will take care of the rest
         def subject_notifier(obj=None):
             return self.dispatch_to(subject_name=subject_name, obj=obj)
+
         uploader._add_to_notify_list(subject_notifier)
 
     def dispatch_to(self, subject_name: str, obj: Any = None) -> None:
@@ -111,9 +113,12 @@ class Store:
             subject.manager.dispatch(obj)
             subject.history.append(obj)
 
-    def get_subscriber_for(self, subject_name: str) -> Subscriber:
-        """Creates and Returns a new subscriber that is subscribed to the specified subject"""
-        subject_name = str(subject_name)
+    def get_subscriber_for(self, subject_name: Union[Iterable[str], str], include_history: bool = True) -> Subscriber:
+        """Creates and Returns a new subscriber that is subscribed to the specified subject(s)"""
         new_subscriber = Subscriber()
-        self.bind_subscribe_to_subject(subject_name, new_subscriber)
+        # make sure it can be safely iterated on
+        if isinstance(subject_name, str) or not isinstance(subject_name, Iterable_abc):
+            subject_name = [subject_name]
+        for sn in subject_name:
+            self.bind_subscribe_to_subject(str(sn), new_subscriber, include_history)
         return new_subscriber
