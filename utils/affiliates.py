@@ -28,16 +28,17 @@ class Subscriber:
         self._feed: List[BaseAction] = []
 
     def consume(self) -> BaseAction:
-        """Consumes the top item in the feed. If no elements then blocks until an item appears in the feed"""
+        """Consumes the top action in the feed. If no action then blocks until an action appears in the feed"""
         with self._condmutex:
             self._wait_for_event()
             return self._feed.pop(0)
 
     def subscribe_to(self, action: Type[BaseAction], include_history: bool = True):
+        """Start getting notified whenever this action is dispatched to the store."""
         self.store._bind_subscriber_to_action(self, action, include_history)
 
     def _wait_for_event(self) -> None:
-        """blocks until an item arrives in the feed."""
+        """blocks until an action arrives in the feed."""
         while True:
             # will wait for 49 days but add a while loop just in case an event takes even longer to come
             flag = self._condmutex.wait_for(lambda: len(self._feed) > 0, threading.TIMEOUT_MAX)
@@ -45,19 +46,20 @@ class Subscriber:
                 break
 
     def _new_upload(self, data: BaseAction) -> None:
-        """Used to add a new event to the feed and notify a single waiter"""
+        """Used to add a new action to the feed and notify a single waiter"""
         with self._condmutex:
             self._feed.append(data)
             self._condmutex.notify(n=1)
 
     def check_feed_action_name(self, action_name: str) -> bool:
-        """Checks whether the feed contains the specified action"""
+        """Checks whether the feed contains the specified action by name"""
         for e in self._feed:
             if e.name == action_name:
                 return True
         return False
 
     def check_feed_action_type(self, action_type: Type[BaseAction]) -> bool:
+        """Checks whether the feed contains the specified action or any of its subclassed action by type"""
         for e in self._feed:
             if isinstance(e, action_type):
                 return True
@@ -75,9 +77,11 @@ class Store:
         self._lock = threading.Lock()
 
     def get_new_subscriber(self) -> Subscriber:
+        """Return a brand new subscriber that belongs to this store."""
         return Subscriber(self)
 
     def _register_new_action(self, action_name: str) -> None:
+        """Instantiates the key:value pair for a new action. Does nothing if action already exists in this store"""
         if action_name in self._store:
             return
         with self._lock:
