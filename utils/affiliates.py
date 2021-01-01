@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import List, NamedTuple, Type
+from typing import List, NamedTuple, Type, Union
 from abc import ABC, abstractmethod
 
 
@@ -27,23 +27,28 @@ class Subscriber:
         self._condmutex = threading.Condition()
         self._feed: List[BaseAction] = []
 
-    def consume(self) -> BaseAction:
-        """Consumes the top action in the feed. If no action then blocks until an action appears in the feed"""
+    def consume(self, timeout=None) -> Union[BaseAction, None]:
+        """Consumes the top action in the feed. If no action then blocks until an action is received or timeout"""
         with self._condmutex:
-            self._wait_for_event()
-            return self._feed.pop(0)
+            new_item = self._wait_for_event(timeout)
+            if new_item:
+                return self._feed.pop(0)
+            else:
+                return None
 
-    def subscribe_to(self, action: Type[BaseAction], include_history: bool = True):
-        """Start getting notified whenever this action is dispatched to the store."""
-        self.store._bind_subscriber_to_action(self, action, include_history)
+    def subscribe_to(self, action: Type[BaseAction], history: bool = True) -> Subscriber:
+        """Start getting notified whenever this action is dispatched to the store. Returns self"""
+        self.store._bind_subscriber_to_action(self, action, history)
+        return self
 
-    def _wait_for_event(self) -> None:
-        """blocks until an action arrives in the feed."""
+    def _wait_for_event(self, timeout=None) -> bool:
+        """blocks until an action arrives in the feed or timeout length. Returns False if timeout occurred"""
+        wait_for_timeout = timeout if timeout is not None else threading.TIMEOUT_MAX
         while True:
             # will wait for 49 days but add a while loop just in case an event takes even longer to come
-            flag = self._condmutex.wait_for(lambda: len(self._feed) > 0, threading.TIMEOUT_MAX)
-            if flag:
-                break
+            flag = self._condmutex.wait_for(lambda: len(self._feed) > 0, wait_for_timeout)
+            if flag or timeout is not None:
+                return flag
 
     def _new_upload(self, data: BaseAction) -> None:
         """Used to add a new action to the feed and notify a single waiter"""
@@ -68,9 +73,9 @@ class Subscriber:
 
 class Store:
     _Shelf = NamedTuple('Shelf',
-                          [('subscribers', List[Subscriber]),
-                           ('history', List[BaseAction]),
-                           ('lock', threading.Lock)])
+                        [('subscribers', List[Subscriber]),
+                         ('history', List[BaseAction]),
+                         ('lock', threading.Lock)])
 
     def __init__(self):
         self._store: dict[str, Store._Shelf] = dict()
@@ -78,7 +83,7 @@ class Store:
 
     def get_new_subscriber(self) -> Subscriber:
         """Return a brand new subscriber that belongs to this store."""
-        return Subscriber(self)
+        return Subscriber(store=self)
 
     def _register_new_action(self, action_name: str) -> None:
         """Instantiates the key:value pair for a new action. Does nothing if action already exists in this store"""
@@ -88,7 +93,8 @@ class Store:
             if action_name not in self._store:
                 self._store[action_name] = Store._Shelf(subscribers=[], history=[], lock=threading.Lock())
 
-    def _bind_subscriber_to_action(self, subscriber: Subscriber, action: Type[BaseAction], include_history: bool = True) -> None:
+    def _bind_subscriber_to_action(self, subscriber: Subscriber, action: Type[BaseAction],
+                                   include_history: bool = True) -> None:
         """Make a subscriber get notified whenever an event is dispatched to this subject."""
         assert issubclass(action, BaseAction), "Expected subclass of BaseAction, got " + str(type(action))
         assert isinstance(action.name, str), "Expected action.name to be of type str (Maybe you gave BaseAction class?)"

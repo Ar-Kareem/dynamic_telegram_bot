@@ -3,7 +3,7 @@ import time
 import threading
 import guppy
 from utils.affiliates import Store, Subscriber, BaseAction
-
+import gc
 
 class val1(BaseAction):
     name = '[BaseAction] val1'
@@ -51,18 +51,17 @@ def uploader_thread(store: Store, num: int):
 # 6 minutes
 
 def subscriber_thread(store, code):
-    start_flag = store.get_new_subscriber()
-    start_flag.subscribe_to(start_flag_consume, include_history=True)
     me: Subscriber = store.get_new_subscriber()
     binary = bin(code)[2:][::-1]
     expected = 0
     for i in range(len(binary)):
         if binary[i] == '1':
-            me.subscribe_to(action_list[i], include_history=True)
+            me.subscribe_to(action_list[i], history=True)
             expected += dispatch_count * (i + 1)
-    me.subscribe_to(stop_flag, include_history=True)
+    me.subscribe_to(stop_flag, history=True)
     print(f'code {code} ready and expecting {expected}')
-    start_flag.consume()  # wait for main thread to signal go
+    # wait for main thread to signal go
+    store.get_new_subscriber().subscribe_to(start_flag_consume, history=True).consume()
     while True:
         e = me.consume()
         if e is None:
@@ -84,58 +83,31 @@ def inspector(subscribers):
         print(f' [{t}] ', end='', flush=True)
 
 
-def main(store, sub_count, uploader_count):
-    threads1 = []
-    threads2 = []
-
-    for i in range(sub_count):
-        t = threading.Thread(target=subscriber_thread, args=(store, i))
-        threads1 += [t]
-
-    for i in range(uploader_count):
-        t = threading.Thread(target=uploader_thread, args=(store, i))
-        threads2 += [t]
-    for i in range(uploader_count):
-        t = threading.Thread(target=uploader_thread, args=(store, i))
-        threads2 += [t]
-
-    # inspect = threading.Thread(target = inspector, args = (subscribers, ))
-    # inspect.daemon = True
-    # inspect.start()
-
-    # store.dispatch(start_flag_consume)
-    store.dispatch(start_flag_upload())
-    store.dispatch(start_flag_consume())
-
-    # for i in range(max(len(threads1), len(threads2))):
-    #     if i < len(threads1):
-    #         threads1[i].start()
-    #     if i < len(threads2):
-    #         threads2[i].start()
-    for i in threads2:
-        i.start()
-    for i in threads1:
-        i.start()
 
 
-    for t in threads2:
-        t.join()
-
-    print('uploaders finished, main thread halting')
-    store.dispatch(stop_flag())
-
-    for t in threads1:
-        t.join()
-
-    print("\nthread finished...exiting")
-
-
-
-dispatch_count = int(100_000)
+dispatch_count = int(1_000)
 
 
 class MyTestCase(unittest.TestCase):
-    def test_something(self):
+    def test_main(self):
+        def main(store, sub_count, uploader_count):
+            threads1 = [threading.Thread(target=subscriber_thread, args=(store, i)) for i in range(sub_count)]
+            threads2 = [threading.Thread(target=uploader_thread, args=(store, i % uploader_count)) for i in
+                        range(uploader_count * 2)]
+            # inspect = threading.Thread(target = inspector, args = (subscribers, ))
+            # inspect.daemon = True
+            # inspect.start()
+            [i.start() for i in threads2]
+            [i.start() for i in threads1]
+            store.dispatch(start_flag_upload())
+            store.dispatch(start_flag_consume())
+            for t in threads2:
+                t.join()
+            print('uploaders finished, main thread halting')
+            store.dispatch(stop_flag())
+            for t in threads1:
+                t.join()
+            print("\nthread finished...exiting")
         hp = guppy.hpy()
         hp.setrelheap()
 
@@ -149,3 +121,45 @@ class MyTestCase(unittest.TestCase):
         print(hp.heap())
         print(hp.heap().byid[0].sp)
 
+    def test_wait(self):
+        def slow_uploader(store):
+            for _ in range(5):
+                time.sleep(.2)
+                store.dispatch(val1())
+            time.sleep(.1)
+            store.dispatch(stop_flag())
+        store = Store()
+        t = threading.Thread(target=slow_uploader, args=(store, ))
+        t.start()
+        sub = store.get_new_subscriber()
+        sub.subscribe_to(val1)
+        sub.subscribe_to(stop_flag)
+        while True:
+            k = sub.consume(timeout=0.05)
+            if k is None:
+                print('TIMEOUT')
+            elif isinstance(k, stop_flag):
+                print('STOP FLAG')
+                break
+            elif isinstance(k, val1):
+                print('GOT 1')
+
+    def test_weakref(self):
+        def sub(store: Store, i):
+            for _ in range(i):
+                store.get_new_subscriber().subscribe_to(start_flag_consume, history=False).consume()
+            store.get_new_subscriber().subscribe_to(stop_flag, history=False).consume()
+        hp = guppy.hpy()
+        hp.setrelheap()
+        storee = Store()
+        count = 5
+        threads1 = [threading.Thread(target=sub, args=(storee, count)) for _ in range(1000)]
+        for t in threads1:
+            t.daemon = True
+            t.start()
+        for _ in range(count):
+            time.sleep(0.1)
+            storee.dispatch(start_flag_consume())
+        time.sleep(1)
+        print(hp.heap())
+        # print(hp.heap().byid[0].sp)
