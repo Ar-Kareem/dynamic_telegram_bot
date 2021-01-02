@@ -2,30 +2,28 @@ from __future__ import annotations
 
 import threading
 from typing import List, NamedTuple, Type, Union
-from abc import ABC, abstractmethod
+from abc import ABC
 
 
 class BaseAction(ABC):
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """:return: the name of the action"""
-    @property
-    def payload(self) -> any:
-        """:return: the payload of the action"""
+    def __init__(self, payload=None):
+        self.payload = payload
 
 
 class TestAction(BaseAction):
-    name = '[BaseAction] TestAction'
-    payload = 123
+    def __init__(self, payload=None):
+        super().__init__(payload)
+
     def __repr__(self):
         return str(self.payload)
 
+
 class Subscriber:
     def __init__(self, store: Store):
-        self.store = store # user Weakref here
+        self.store = store  # user Weakref here
         self._condmutex = threading.Condition()
         self._feed: List[BaseAction] = []
+        self._subscribed_action: List[Type[BaseAction]] = []  # list of subbed to actions for checking sub/parents
 
     def consume(self, timeout=None) -> Union[BaseAction, None]:
         """Consumes the top action in the feed. If no action then blocks until an action is received or timeout"""
@@ -38,6 +36,15 @@ class Subscriber:
 
     def subscribe_to(self, action: Type[BaseAction], history: bool = True) -> Subscriber:
         """Start getting notified whenever this action is dispatched to the store. Returns self"""
+        with self._condmutex:
+            if action in self._subscribed_action:
+                print('Already subbed.')
+                return self
+            for t in self._subscribed_action:
+                if issubclass(action, t) or issubclass(t, action):
+                    print('NOT SUPPORTED YET. SUBBING TO', action, 'WHILE ALREADY SUBBED TO', t)
+                    return self
+            self._subscribed_action.append(action)
         self.store._bind_subscriber_to_action(self, action, history)
         return self
 
@@ -56,14 +63,7 @@ class Subscriber:
             self._feed.append(data)
             self._condmutex.notify(n=1)
 
-    def check_feed_action_name(self, action_name: str) -> bool:
-        """Checks whether the feed contains the specified action by name"""
-        for e in self._feed:
-            if e.name == action_name:
-                return True
-        return False
-
-    def check_feed_action_type(self, action_type: Type[BaseAction]) -> bool:
+    def check_feed_action(self, action_type: Union[Type[BaseAction], List[Type[BaseAction]]]) -> bool:
         """Checks whether the feed contains the specified action or any of its subclassed action by type"""
         for e in self._feed:
             if isinstance(e, action_type):
@@ -78,41 +78,55 @@ class Store:
                          ('lock', threading.Lock)])
 
     def __init__(self):
-        self._store: dict[str, Store._Shelf] = dict()
+        self._store: dict[type, Store._Shelf] = dict()
         self._lock = threading.Lock()
 
     def get_new_subscriber(self) -> Subscriber:
         """Return a brand new subscriber that belongs to this store."""
         return Subscriber(store=self)
 
-    def _register_new_action(self, action_name: str) -> None:
+    def _register_new_action_type(self, action_type: Type[BaseAction]) -> None:
         """Instantiates the key:value pair for a new action. Does nothing if action already exists in this store"""
-        if action_name in self._store:
+        if action_type in self._store:
             return
         with self._lock:
-            if action_name not in self._store:
-                self._store[action_name] = Store._Shelf(subscribers=[], history=[], lock=threading.Lock())
+            # go through mro and register all
+            for t in action_type.mro():
+                if t not in self._store:
+                    self._store[t] = Store._Shelf(subscribers=[], history=[], lock=threading.Lock())
 
-    def _bind_subscriber_to_action(self, subscriber: Subscriber, action: Type[BaseAction],
+    def _bind_subscriber_to_action(self, subscriber: Subscriber, action_type: Type[BaseAction],
                                    include_history: bool = True) -> None:
         """Make a subscriber get notified whenever an event is dispatched to this subject."""
-        assert issubclass(action, BaseAction), "Expected subclass of BaseAction, got " + str(type(action))
-        assert isinstance(action.name, str), "Expected action.name to be of type str (Maybe you gave BaseAction class?)"
-        assert not isinstance(action, BaseAction), "Expected type of BaseAction not an actual instance"
-        action_name = str(action.name)
-        self._register_new_action(action_name)  # make sure action already in store
-        shelf = self._store[action_name]
-        with shelf.lock:  # lock for editing shelf
-            shelf.subscribers.append(subscriber) # user weakref here
-            if include_history:
+        assert issubclass(action_type, BaseAction), "got " + str(action_type) + ", type:" + str(type(action_type)) + ", not BaseAction"
+        self._register_new_action_type(action_type)  # make sure action already in store
+        if not include_history:  # simple case
+            self._store[action_type].subscribers.append(subscriber)
+            return
+        # complicated case, need to make sure history of all children in sync with new subscriber
+        with self._lock:  # make sure no new actions are registered while locking all children actions
+            subclass_shelves = [shelf for shelf_action_type, shelf in self._store.items() if issubclass(shelf_action_type, action_type)]
+            for shelf in subclass_shelves:  # lock all children
+                shelf.lock.acquire()
+            # all children locked, now its safe to add subscriber to the list and append all children histories
+            self._store[action_type].subscribers.append(subscriber)
+            for shelf in subclass_shelves:
                 for past_action in shelf.history:
                     subscriber._new_upload(past_action)
+            for shelf in subclass_shelves:  # release all children
+                shelf.lock.release()
 
     def dispatch(self, action: BaseAction) -> None:
-        """Dispatch an event to all subscribers of a given subject"""
-        self._register_new_action(action.name)  # make sure action already in store
-        shelf = self._store[action.name]
+        """Dispatch an event to all subscribers of a given action"""
+        self._register_new_action_type(type(action))  # make sure action already in store
+        shelf = self._store[type(action)]
         with shelf.lock:  # lock for editing shelf
+            # add to history and notify all subscribers
+            shelf.history.append(action)
             for subscriber in shelf.subscribers:
                 subscriber._new_upload(action)
-            shelf.history.append(action)
+            # notify all parent subscribers
+            parent_shelves = [self._store[parent] for parent in type(action).mro()[1:]]
+            for parent_shelf in parent_shelves:
+                for subscriber in parent_shelf.subscribers:
+                        subscriber._new_upload(action)
