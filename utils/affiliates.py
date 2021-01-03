@@ -116,11 +116,11 @@ class Store:
                 shelf.lock.acquire()
             # all children locked, now its safe to add subscriber to the list and append all children histories
             self._store[action_type].subscribers.append(subscriber)
-            for shelf in children_shelves:
-                for past_action in shelf.history:
-                    subscriber._new_upload(past_action)
-            for shelf in children_shelves:  # release all children
-                shelf.lock.release()
+        for shelf in children_shelves:
+            for past_action in shelf.history:
+                subscriber._new_upload(past_action)
+        for shelf in children_shelves:  # release all children
+            shelf.lock.release()
 
     def dispatch(self, action: BaseAction) -> None:
         """Dispatch an event to all subscribers of a given action"""
