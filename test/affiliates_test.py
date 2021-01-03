@@ -5,35 +5,36 @@ import guppy
 from utils.affiliates import Store, Subscriber, BaseAction
 import gc
 
-class val1(BaseAction):
-    name = '[BaseAction] val1'
-    payload = 1
-class val2(BaseAction):
-    name = '[BaseAction] val2'
-    payload = 2
-class val3(BaseAction):
-    name = '[BaseAction] val3'
-    payload = 3
-class val4(BaseAction):
-    name = '[BaseAction] val4'
-    payload = 4
-class val5(BaseAction):
-    name = '[BaseAction] val5'
-    payload = 5
-action_list = [val1, val2, val3, val4, val5]
+class Val(BaseAction):
+    def __init__(self, value: int):
+        super(Val, self).__init__(payload=value)
+class Val1(Val):
+    def __init__(self):
+        super(Val1, self).__init__(1)
+class Val2(Val):
+    def __init__(self):
+        super(Val2, self).__init__(2)
+class Val3(Val):
+    def __init__(self):
+        super(Val3, self).__init__(3)
+class Val4(Val):
+    def __init__(self):
+        super(Val4, self).__init__(4)
+class Val5(Val):
+    def __init__(self):
+        super(Val5, self).__init__(5)
+action_list = [Val1, Val2, Val3, Val4, Val5]
 
 
 class start_flag_upload(BaseAction):
-    name = '[BaseAction] start_flag_upload'
+    pass
 class start_flag_consume(BaseAction):
-    name = '[BaseAction] start_flag_consume'
+    pass
 class stop_flag(BaseAction):
-    name = '[BaseAction] stop_flag'
-
+    pass
 
 def uploader_thread(store: Store, num: int):
-    start_flag = store.get_new_subscriber()
-    start_flag.subscribe_to(start_flag_upload, include_history=True)
+    start_flag = store.get_new_subscriber().subscribe_to(start_flag_upload)
 
     action_to_dispatch = action_list[num]
 
@@ -85,7 +86,7 @@ def inspector(subscribers):
 
 
 
-dispatch_count = int(1_000)
+dispatch_count = int(50_000)
 
 
 class MyTestCase(unittest.TestCase):
@@ -125,14 +126,14 @@ class MyTestCase(unittest.TestCase):
         def slow_uploader(store):
             for _ in range(5):
                 time.sleep(.2)
-                store.dispatch(val1())
+                store.dispatch(Val1())
             time.sleep(.1)
             store.dispatch(stop_flag())
         store = Store()
         t = threading.Thread(target=slow_uploader, args=(store, ))
         t.start()
         sub = store.get_new_subscriber()
-        sub.subscribe_to(val1)
+        sub.subscribe_to(Val1)
         sub.subscribe_to(stop_flag)
         while True:
             k = sub.consume(timeout=0.05)
@@ -141,7 +142,7 @@ class MyTestCase(unittest.TestCase):
             elif isinstance(k, stop_flag):
                 print('STOP FLAG')
                 break
-            elif isinstance(k, val1):
+            elif isinstance(k, Val1):
                 print('GOT 1')
 
     def test_weakref(self):
@@ -161,5 +162,120 @@ class MyTestCase(unittest.TestCase):
             time.sleep(0.1)
             storee.dispatch(start_flag_consume())
         time.sleep(1)
+        gc.collect()
         print(hp.heap())
         # print(hp.heap().byid[0].sp)
+
+    def test_basic_mro(self):
+        def sub(subscriber: Subscriber):
+            while True:
+                c = subscriber.consume()
+                if isinstance(c, stop_flag):
+                    break
+                print('got', c.payload)
+        hp = guppy.hpy()
+        hp.setrelheap()
+        store = Store()
+        count = 5
+        threads1 = [threading.Thread(target=sub, args=(store.get_new_subscriber().subscribe_to(stop_flag).subscribe_to(Val), )) for _ in range(3)]
+        for t in threads1:
+            t.daemon = True
+            t.start()
+        for _ in range(count):
+            time.sleep(0.1)
+            store.dispatch(Val1())
+            store.dispatch(Val2())
+            store.dispatch(Val3())
+        store.dispatch(stop_flag())
+        time.sleep(1)
+        print(hp.heap())
+        # print(hp.heap().byid[0].sp)
+
+    def test_many_subclasses_mro(self):
+        parents = [
+            type('val-' + str(i), (Val,), {'__init__': lambda self, inp, i=i: Val.__init__(self, i * 100 + inp)})
+            for i in range(100)]
+        children = [type(p.__name__ + '-' + str(i), (p,), {'__init__': lambda self, p=p, i=i: p.__init__(self, i)}) for
+                    p in parents for i in range(100)]
+        record_keeping_parents = [[] for _ in range(100)]
+        record_keeping_children = [[] for _ in range(10000)]
+        import random
+        def uploader(store: Store, count: int):
+            store.get_new_subscriber().subscribe_to(start_flag_upload, history=False).consume()
+            for _ in range(count):
+                r = random.randint(0, 9999)
+                record_keeping_parents[r//100].append(r)
+                record_keeping_children[r].append(r)
+                store.dispatch(children[r]())
+        def sub(store: Store, count: int):
+            me = store.get_new_subscriber()
+            store.get_new_subscriber().subscribe_to(start_flag_consume, history=False).consume()
+            comp = []
+            for _ in range(count):
+                r = random.randint(0, 9999)
+                me.subscribe_to(children[r])
+                comp.append(r)
+            me.subscribe_to(stop_flag)
+            tot = 0
+            while True:
+                c = me.consume()
+                if isinstance(c, stop_flag):
+                    break
+                elif c is None:
+                    continue
+                tot += c.payload
+            tot2 = 0
+            for i in list(set(comp)):
+                tot2 += sum(record_keeping_children[i])
+            assert tot == tot2, str(tot) + ' ' + str(tot2) + str(list(set(comp)))
+            store.dispatch(BaseAction(payload=tot == tot2))
+        def subp(store: Store, count: int):
+            me = store.get_new_subscriber()
+            store.get_new_subscriber().subscribe_to(start_flag_consume, history=False).consume()
+            comp = []
+            for _ in range(count):
+                r = random.randint(0, 99)
+                me.subscribe_to(parents[r])
+                comp.append(r)
+            me.subscribe_to(stop_flag)
+            tot = 0
+            while True:
+                c = me.consume()
+                if isinstance(c, stop_flag):
+                    break
+                elif c is None:
+                    continue
+                tot += c.payload
+            tot2 = 0
+            for i in list(set(comp)):
+                tot2 += sum(record_keeping_parents[i])
+            assert tot == tot2, str(tot) + ' ' + str(tot2) + str(list(set(comp)))
+            store.dispatch(BaseAction(payload=tot == tot2))
+
+        store = Store()
+        random.seed(3243)
+        threads1 = [threading.Thread(target=uploader, args=(store, 3000)) for _ in range(30)]
+        threads2 = [threading.Thread(target=sub, args=(store, 100)) for _ in range(20)]
+        threads3 = [threading.Thread(target=subp, args=(store, 3)) for _ in range(10)]
+        for t in threads1:
+            t.daemon = True
+            t.start()
+        for t in threads2:
+            t.daemon = True
+            t.start()
+        for t in threads3:
+            t.daemon = True
+            t.start()
+        store.dispatch(start_flag_upload())
+        time.sleep(0.2)
+        store.dispatch(start_flag_consume())
+        for t in threads1:
+            t.join()
+        print('stop flag')
+        store.dispatch(stop_flag())
+        for t in threads2:
+            t.join()
+        for t in threads3:
+            t.join()
+        print([x.payload for x in store._store[BaseAction].history])
+        print([i for i in range(len(record_keeping_children)) if len(record_keeping_children[i]) == 0])

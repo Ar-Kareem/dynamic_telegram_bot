@@ -89,9 +89,7 @@ def get_all_handler_scripts(parent_folder_path='handlers', function_name_check='
 
 def wait_until_terminate_flag(global_flags, period=2.5):
     while not global_flags['terminate_flag']:
-        print('tic', time.sleep)
         time.sleep(period)
-        print('toc', time.sleep)
 
 
 def main_bot_loop():
