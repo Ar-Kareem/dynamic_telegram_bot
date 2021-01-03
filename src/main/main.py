@@ -57,7 +57,7 @@ def get_init_global_flags():
 
 
 def init_dispatcher(updater):
-    script_modules = get_all_handler_scripts(parent_folder_path='handlers', function_name_check='init_handlers')
+    script_modules = get_all_handler_scripts(parent_folder_path='../handlers', function_name_check='init_handlers')
     for script in script_modules:
         try:
             script.init_handlers(updater)

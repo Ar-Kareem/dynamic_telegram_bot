@@ -2,7 +2,7 @@ import unittest
 import time
 import threading
 import guppy
-from utils.affiliates import Store, Subscriber, BaseAction
+from src.utils.affiliates import Store, Subscriber, BaseAction
 import gc
 
 class Val(BaseAction):
