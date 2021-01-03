@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import List, NamedTuple, Type, Union
+from typing import List, NamedTuple, Type, Union, Tuple, Callable
 from abc import ABC
 
 import logging
@@ -136,3 +136,40 @@ class Store:
             for parent_shelf in parent_shelves:
                 for subscriber in parent_shelf.subscribers:
                     subscriber._new_upload(action)
+
+
+class Reducer:
+    def __init__(self, store: Store):
+        self._subscriber = store.get_new_subscriber().subscribe_to(BaseAction, history=True)
+        self._handlers: List[Tuple[Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
+                                   Callable[[BaseAction, ], None]]] = []
+        self._history: List[BaseAction] = []
+        self._lock = threading.Lock()
+
+    def register_handler(self, trigger: Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
+                         callback: Callable[[BaseAction, ], None]) -> None:
+        with self._lock:
+            self._handlers.append((trigger, callback))
+            for action in self._history:
+                if isinstance(action, trigger):
+                    callback(action)
+
+    def start(self, non_blocking=False) -> [threading.Thread, None]:
+        if non_blocking:
+            t = threading.Thread(target=self.start, args=())
+            t.start()
+            return t
+
+        while True:
+            action = self._subscriber.consume()
+            if action is None:
+                continue
+            with self._lock:
+                self._history.append(action)
+                for trigger, callback in self._handlers:
+                    # noinspection PyBroadException
+                    try:
+                        if isinstance(action, trigger):
+                            callback(action)
+                    except Exception:
+                        logger.exception('Exception occurred while handling reducer for: ' + str(callback))
