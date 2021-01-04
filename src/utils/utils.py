@@ -1,4 +1,5 @@
 import os
+from configparser import ConfigParser
 from pathlib import Path
 import importlib
 import logging
@@ -18,6 +19,16 @@ def get_handlers_path_relative() -> Path:
 def get_handlers_import_path_relative() -> str:
     """Returns the import path of the handlers directory relative to the main directory. Needed to dynamically import"""
     return 'src.handlers'
+
+
+def get_config() -> ConfigParser:
+    try:
+        config = ConfigParser()
+        config.read('settings.ini')
+        return config
+    except Exception:
+        logger.exception('Failed to load settings.ini file. Terminating')
+        raise
 
 
 def get_all_scripts(function_name_check: str, script_module_import_path: str = None, script_module_path: Path = None):
