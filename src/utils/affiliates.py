@@ -9,16 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class BaseAction(ABC):
-    def __init__(self, payload=None):
-        self.payload = payload
+    pass
 
 
-class TestAction(BaseAction):
-    def __init__(self, payload=None):
-        super().__init__(payload)
-
-    def __repr__(self):
-        return str(self.payload)
+class ChildAction(BaseAction):
+    pass
 
 
 # noinspection PyProtectedMember
@@ -144,7 +139,7 @@ class Reducer:
         self._handlers: List[Tuple[Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
                                    Callable[[BaseAction, ], None]]] = []
         self._history: List[BaseAction] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # need RLock in case of register_handler is used while resolving _handle_action
 
     def register_handler(self, trigger: Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
                          callback: Callable[[BaseAction, ], None]) -> None:
@@ -154,22 +149,27 @@ class Reducer:
                 if isinstance(action, trigger):
                     callback(action)
 
-    def start(self, non_blocking=False) -> [threading.Thread, None]:
+    def start(self, non_blocking=False, stop_action: type(BaseAction) = None) -> [threading.Thread, None]:
         if non_blocking:
-            t = threading.Thread(target=self.start, args=())
+            t = threading.Thread(target=self.start, kwargs={'non_blocking': False, 'stop_action': stop_action})
             t.start()
             return t
-
         while True:
-            action = self._subscriber.consume()
-            if action is None:
-                continue
-            with self._lock:
-                self._history.append(action)
-                for trigger, callback in self._handlers:
-                    # noinspection PyBroadException
-                    try:
-                        if isinstance(action, trigger):
-                            callback(action)
-                    except Exception:
-                        logger.exception('Exception occurred while handling reducer for: ' + str(callback))
+            new_action = self._subscriber.consume()
+            self._handle_action(new_action)
+            if stop_action is not None and isinstance(new_action, stop_action):
+                break
+
+    def _handle_action(self, new_action) -> None:
+        if new_action is None:
+            return
+        with self._lock:
+            for trigger, callback in self._handlers:
+                # noinspection PyBroadException
+                try:
+                    if isinstance(new_action, trigger):
+                        callback(new_action)
+                except Exception:
+                    logger.exception('Exception occurred while handling reducer for: ' + str(callback))
+            # only register to history after handlers are done.
+            self._history.append(new_action)

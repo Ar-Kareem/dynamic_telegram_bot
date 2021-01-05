@@ -7,7 +7,8 @@ import gc
 
 class Val(BaseAction):
     def __init__(self, value: int):
-        super(Val, self).__init__(payload=value)
+        super(Val, self).__init__()
+        self.payload = value
 class Val1(Val):
     def __init__(self):
         super(Val1, self).__init__(1)
@@ -228,7 +229,6 @@ class MyTestCase(unittest.TestCase):
             for i in list(set(comp)):
                 tot2 += sum(record_keeping_children[i])
             assert tot == tot2, str(tot) + ' ' + str(tot2) + str(list(set(comp)))
-            store.dispatch(BaseAction(payload=tot == tot2))
         def subp(store: Store, count: int):
             me = store.get_new_subscriber()
             store.get_new_subscriber().subscribe_to(start_flag_consume, history=False).consume()
@@ -250,7 +250,6 @@ class MyTestCase(unittest.TestCase):
             for i in list(set(comp)):
                 tot2 += sum(record_keeping_parents[i])
             assert tot == tot2, str(tot) + ' ' + str(tot2) + str(list(set(comp)))
-            store.dispatch(BaseAction(payload=tot == tot2))
 
         store = Store()
         random.seed(3243)
