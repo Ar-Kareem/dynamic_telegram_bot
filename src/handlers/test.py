@@ -1,16 +1,27 @@
 import logging
+from functools import partial
 
 from telegram import Update
 from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
 
+from src.core.actions import TelegramBotInitiated
+from src.core.start import Pocket
+from src.utils.affiliates import BaseAction
+import time
+
 logger = logging.getLogger(__name__)
+
 
 def test(update: Update, context: CallbackContext) -> None:
     logger.info('Test Activated.')
     update.message.reply_text('test :)')
-    context.bot.send_message(chat_id=update.effective_chat.id, text=update.effective_chat.id)
 
-def init_handlers(updater):
-    dispatcher = updater.dispatcher
+
+def init_bot_handlers(action: BaseAction, pocket: Pocket):
+    dispatcher = pocket.telegram_updater.dispatcher
     dispatcher.add_handler(CommandHandler("test", test))
 
+
+def init(pocket: Pocket):
+    pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
+    pocket.set('start_time', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))

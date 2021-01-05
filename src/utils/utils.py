@@ -21,7 +21,7 @@ def get_handlers_import_path_relative() -> str:
     return 'src.handlers'
 
 
-def get_config() -> ConfigParser:
+def init_config() -> ConfigParser:
     try:
         config = ConfigParser()
         config.read('settings.ini')
@@ -38,7 +38,6 @@ def get_all_scripts(function_name_check: str, script_module_import_path: str = N
         script_module_path = get_handlers_path_relative()
 
     importlib.invalidate_caches()
-    print(os.listdir(script_module_path))
     script_names = [f.rstrip('.py') for f in os.listdir(script_module_path) if f.endswith('.py')]
     module_list = []
 
