@@ -149,7 +149,7 @@ class Reducer:
                 if isinstance(action, trigger):
                     callback(action)
 
-    def start(self, non_blocking=False, stop_action: type(BaseAction) = None) -> [threading.Thread, None]:
+    def start(self, non_blocking=False, stop_action: type(BaseAction) = None) -> [threading.Thread, BaseAction, None]:
         if non_blocking:
             t = threading.Thread(target=self.start, kwargs={'non_blocking': False, 'stop_action': stop_action})
             t.start()
@@ -158,7 +158,7 @@ class Reducer:
             new_action = self._subscriber.consume()
             self._handle_action(new_action)
             if stop_action is not None and isinstance(new_action, stop_action):
-                break
+                return new_action
 
     def _handle_action(self, new_action) -> None:
         if new_action is None:
