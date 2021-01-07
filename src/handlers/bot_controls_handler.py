@@ -77,8 +77,9 @@ def init(pocket: Pocket):
     updater = Updater(bot_key, use_context=True)
     # inject pocket into bot_data
     updater.dispatcher.bot_data['pocket'] = pocket
-    # inject bot into pocket (and dispatch a notification)
-    pocket.register_bot(updater)
+    # inject bot into pocket and dispatch a notification
+    pocket.telegram_updater = updater
+    pocket.store.dispatch(TelegramBotInitiated())
 
     # no need to set a handler (can instantly call init bot handlers) but do so for consistency with other scripts
     pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
