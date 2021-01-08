@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from threading import Thread
 import logging
 
@@ -17,6 +18,7 @@ def start():
 
 
 def init_logger():
+    Path("logs").mkdir(exist_ok=True)
     warn_file_handler = logging.FileHandler(filename='logs/logs_warn.log')
     warn_file_handler.setLevel(logging.WARN)
     debug_file_handler = logging.FileHandler(filename='logs/logs_debug.log')
