@@ -1,6 +1,5 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
-import socket
 
 
 class MyHTTPHandler(BaseHTTPRequestHandler):
@@ -28,7 +27,7 @@ def start_server(handler: MyHTTPHandler, server_port: int = 8049, localhost: boo
     if localhost:
         hostname = 'localhost'
     else:
-        hostname = socket.gethostname()
+        hostname = ''
 
     webserver = HTTPServer((hostname, server_port), handler)
     thread = threading.Thread(target=webserver.serve_forever)
