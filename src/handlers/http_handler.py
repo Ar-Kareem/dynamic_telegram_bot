@@ -10,6 +10,8 @@ pocket_dict_name = 'http_handler_dict'
 
 
 def init(pocket: Pocket):
+    if not pocket.config.getboolean('SERVER', 'start'):
+        return
     pocket.set(pocket_dict_name, {})
 
     # create HTTP Handler and bind functionality to it

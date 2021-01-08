@@ -72,6 +72,9 @@ def init_bot_handlers(action: BaseAction, pocket: Pocket):
 
 
 def init(pocket: Pocket):
+    if not pocket.config.getboolean('TELEGRAM', 'start'):
+        return
+
     # init bot
     bot_key = pocket.config['TELEGRAM']['token']
     updater = Updater(bot_key, use_context=True)
