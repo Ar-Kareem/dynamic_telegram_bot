@@ -45,7 +45,7 @@ def echo(update: Update, context: CallbackContext) -> None:
 # Action Handlers
 def handle_send_message(action: BaseAction, pocket: Pocket):
     if isinstance(action, TelegramMessageToMe):
-        pocket.telegram_updater.bot.send_message(chat_id=pocket.config['TOKENS']['my_chat_id'], text=action.message)
+        pocket.telegram_updater.bot.send_message(chat_id=pocket.config['TELEGRAM']['my_chat_id'], text=action.message)
     elif isinstance(action, SendTelegramMessage):
         pocket.telegram_updater.bot.send_message(chat_id=action.to, text=action.message)
 
@@ -73,7 +73,7 @@ def init_bot_handlers(action: BaseAction, pocket: Pocket):
 
 def init(pocket: Pocket):
     # init bot
-    bot_key = pocket.config['TOKENS']['telegram']
+    bot_key = pocket.config['TELEGRAM']['token']
     updater = Updater(bot_key, use_context=True)
     # inject pocket into bot_data
     updater.dispatcher.bot_data['pocket'] = pocket

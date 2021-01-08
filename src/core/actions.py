@@ -12,7 +12,7 @@ class Terminate(BaseAction):
 
 
 class AddServerHandler(BaseAction):
-    def __init__(self, method, prefix_to_handle, handler):
+    def __init__(self, method, prefix_to_handle: str, handler: callable):
         super().__init__()
         self.method = method
         self.prefix_to_handle = prefix_to_handle
