@@ -133,6 +133,12 @@ class Store:
                     subscriber._new_upload(action)
 
 
+# Define Types
+BaseActionType = Type[BaseAction]
+BaseActionTypeTuple = Union[BaseActionType, Tuple[BaseActionType, ...]]
+Callback = Callable[[BaseAction], None]
+
+
 class Reducer:
     def __init__(self, store: Store):
         self._subscriber = store.get_new_subscriber().subscribe_to(BaseAction, history=True)
@@ -141,15 +147,15 @@ class Reducer:
         self._history: List[BaseAction] = []
         self._lock = threading.RLock()  # need RLock in case of register_handler is used while resolving _handle_action
 
-    def register_handler(self, trigger: Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
-                         callback: Callable[[BaseAction, ], None]) -> None:
+    def register_handler(self, trigger: BaseActionTypeTuple, callback: Callback) -> None:
         with self._lock:
             self._handlers.append((trigger, callback))
             for action in self._history:
                 if isinstance(action, trigger):
                     callback(action)
 
-    def start(self, non_blocking=False, stop_action: type(BaseAction) = None) -> [threading.Thread, BaseAction, None]:
+    def start(self, non_blocking=False, stop_action: BaseActionType = None) -> [threading.Thread, BaseAction, None]:
+        """This is the main function for a reducer object which starts listening and handling actions"""
         if non_blocking:
             t = threading.Thread(target=self.start, kwargs={'non_blocking': False, 'stop_action': stop_action})
             t.start()
