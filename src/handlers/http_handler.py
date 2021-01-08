@@ -15,7 +15,7 @@ def init(pocket: Pocket):
     handler.pocket = pocket
     for func in (do_POST, do_GET):
         handler.bind(func)
-    http_server = start_server(handler, server_port=8049)
+    http_server = start_server(handler, server_port=int(pocket.config['SERVER']['port']))
 
     pocket.reducer.register_handler(trigger=Terminate, callback=lambda _: close_server(http_server))
     pocket.reducer.register_handler(trigger=AddServerHandler, callback=partial(add_server_handler, pocket=pocket))
@@ -24,11 +24,16 @@ def init(pocket: Pocket):
 def add_server_handler(action: AddServerHandler, pocket: Pocket):
     module_inner_pocket: dict = pocket.get(pocket_dict_name)
     method = action.method.upper()
-    if method in ('POST', 'GET'):
-        t = (action.prefix_to_handle, action.handler)
-        module_inner_pocket.setdefault(method, []).append(t)
-    else:
-        print('UNKNOWN METHOD')
+    if method not in ('POST', 'GET'):
+        logger.error('UNKNOWN METHOD: %s', method)
+        return
+    for other_prefix, _ in module_inner_pocket.setdefault(method, []):
+        if action.prefix_to_handle.startswith(other_prefix) or other_prefix.startswith(action.prefix_to_handle):
+            logger.error('Attempted to register server handler with a conflicting prefix old:(%s) new:(%s)',
+                         other_prefix, action.prefix_to_handle)
+            return
+    t = (action.prefix_to_handle, action.handler)
+    module_inner_pocket.setdefault(method, []).append(t)
 
 
 # Methods to be bound to MyHTTPHandler
