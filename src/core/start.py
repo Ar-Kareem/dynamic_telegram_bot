@@ -35,7 +35,7 @@ def init_logger():
 
 
 def init_scripts(pocket: Pocket):
-    scripts = utils.get_all_scripts(function_name_check='init')
+    scripts = utils.get_all_scripts(function_name_check='init', recursive=True)
     for script in scripts:
         # noinspection PyBroadException
         try:

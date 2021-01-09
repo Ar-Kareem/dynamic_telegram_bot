@@ -31,7 +31,8 @@ def init_config() -> ConfigParser:
         raise
 
 
-def get_all_scripts(function_name_check: str, script_module_import_path: str = None, script_module_path: Path = None):
+def get_all_scripts(function_name_check: str, script_module_import_path: str = None,
+                    script_module_path: Path = None, recursive: bool = False):
     if script_module_import_path is None:
         script_module_import_path = get_handlers_import_path_relative()
     if script_module_path is None:
@@ -51,4 +52,13 @@ def get_all_scripts(function_name_check: str, script_module_import_path: str = N
                 logger.warning('Dynamically imported script "' + sn + '.py" has no callable ' + function_name_check)
         except Exception as e:
             logger.error('Error occurred while dynamically importing script "' + sn + '.py"', exc_info=e)
+
+    # collect inner directories to repeat recursively
+    if recursive:
+        inner_directories = [f for f in os.listdir(script_module_path) if os.path.isdir(script_module_path / f)]
+        for inner_dir_name in inner_directories:
+            inner_import_path = script_module_import_path + '.' + inner_dir_name
+            inner_path = script_module_path / inner_dir_name
+            module_list += get_all_scripts(function_name_check, inner_import_path, inner_path, recursive=True)
+
     return module_list
