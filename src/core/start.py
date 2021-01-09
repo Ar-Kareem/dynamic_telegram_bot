@@ -51,5 +51,5 @@ def reducer_loop(pocket: Pocket):
         if last_action.reset_flag:
             Thread(target=start).start()
     except KeyboardInterrupt:
-        pocket.store.dispatch(Terminate(reset_flag=False))
-        reducer_loop(pocket)  # need to start reducer loop again to handle the terminate action just dispatcher
+        pocket.store.dispatch(Terminate())
+        pocket.reducer.start(stop_action=Terminate)  # need handle the terminate action just dispatched
