@@ -39,13 +39,14 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
             self.logger.info(format_, *args)
 
 
-def start_server(handler: MyHTTPHandler, server_port: int = 8049, localhost: bool = False) -> HTTPServer:
-    if localhost:
-        hostname = 'localhost'
-    else:
-        hostname = socket.gethostname()
+def start_server(handler: MyHTTPHandler, hostname: str = None, localhost: bool = False, port: int = 8049) -> HTTPServer:
+    if hostname is None:
+        if localhost:
+            hostname = 'localhost'
+        else:
+            hostname = socket.gethostname()
 
-    webserver = HTTPServer((hostname, server_port), handler)
+    webserver = HTTPServer((hostname, port), handler)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
     thread.start()
@@ -55,3 +56,11 @@ def start_server(handler: MyHTTPHandler, server_port: int = 8049, localhost: boo
 def close_server(server: HTTPServer) -> None:
     server.shutdown()
     server.server_close()
+
+
+if __name__ == '__main__':
+    start_server(MyHTTPHandler())
+    print('Waiting...')
+    cond = threading.Condition()
+    with cond:
+        cond.wait(threading.TIMEOUT_MAX)

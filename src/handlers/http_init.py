@@ -23,7 +23,7 @@ def init(pocket: Pocket):
     # Attempt to start server at port given in config file
     server_port = int(pocket.config['SERVER']['port'])
     try:
-        http_server = start_server(handler, server_port=server_port)
+        http_server = start_server(handler, port=server_port)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
 
