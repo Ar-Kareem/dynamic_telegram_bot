@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import List, NamedTuple, Type, Union, Tuple, Callable
+from typing import List, NamedTuple, Type, Union, Tuple, Callable, Optional
 from abc import ABC
 
 import logging
@@ -142,31 +142,30 @@ Callback = Callable[[BaseAction], None]
 class Reducer:
     def __init__(self, store: Store):
         self._subscriber = store.get_new_subscriber().subscribe_to(BaseAction, history=True)
-        self._handlers: List[Tuple[Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
-                                   Callable[[BaseAction, ], None]]] = []
+        self._handlers: List[Tuple[BaseActionTypeTuple, Callback]] = []
         self._history: List[BaseAction] = []
         self._lock = threading.RLock()  # need RLock in case of register_handler is used while resolving _handle_action
 
     def register_handler(self, trigger: BaseActionTypeTuple, callback: Callback) -> None:
         with self._lock:
-            self._handlers.append((trigger, callback))
             for action in self._history:
                 if isinstance(action, trigger):
-                    callback(action)
+                    # noinspection PyBroadException
+                    try:
+                        callback(action)
+                    except Exception:
+                        logger.exception('Exception occurred while handling reducer for: ' + str(callback))
+            self._handlers.append((trigger, callback))
 
-    def start(self, non_blocking=False, stop_action: BaseActionType = None) -> [threading.Thread, BaseAction, None]:
+    def start(self, stop_action: BaseActionType = None) -> BaseAction:
         """This is the main function for a reducer object which starts listening and handling actions"""
-        if non_blocking:
-            t = threading.Thread(target=self.start, kwargs={'non_blocking': False, 'stop_action': stop_action})
-            t.start()
-            return t
         while True:
             new_action = self._subscriber.consume()
             self._handle_action(new_action)
             if stop_action is not None and isinstance(new_action, stop_action):
                 return new_action
 
-    def _handle_action(self, new_action) -> None:
+    def _handle_action(self, new_action: Optional[BaseAction]) -> None:
         if new_action is None:
             return
         with self._lock:
@@ -179,3 +178,9 @@ class Reducer:
                     logger.exception('Exception occurred while handling reducer for: ' + str(callback))
             # only register to history after handlers are done.
             self._history.append(new_action)
+
+    def start_non_blocking(self, stop_action: BaseActionType = None) -> threading.Thread:
+        """This runs the start function in a separate thread"""
+        t = threading.Thread(target=self.start, kwargs={'stop_action': stop_action})
+        t.start()
+        return t
