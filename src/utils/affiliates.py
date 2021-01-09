@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import List, NamedTuple, Type, Union, Tuple, Callable
+from typing import List, NamedTuple, Type, Union, Tuple, Callable, Optional
 from abc import ABC
 
 import logging
@@ -145,7 +145,7 @@ class Reducer:
         self._handlers: List[Tuple[Union[Type[BaseAction], Tuple[Type[BaseAction], ...]],
                                    Callable[[BaseAction, ], None]]] = []
         self._history: List[BaseAction] = []
-        self._lock = threading.RLock()  # need RLock in case of register_handler is used while resolving _handle_action
+        self._lock = threading.Lock()
 
     def register_handler(self, trigger: BaseActionTypeTuple, callback: Callback) -> None:
         with self._lock:
@@ -154,7 +154,7 @@ class Reducer:
                 if isinstance(action, trigger):
                     callback(action)
 
-    def start(self, non_blocking=False, stop_action: BaseActionType = None) -> [threading.Thread, BaseAction, None]:
+    def start(self, non_blocking=False, stop_action: BaseActionType = None) -> [threading.Thread, BaseAction]:
         """This is the main function for a reducer object which starts listening and handling actions"""
         if non_blocking:
             t = threading.Thread(target=self.start, kwargs={'non_blocking': False, 'stop_action': stop_action})
@@ -166,16 +166,25 @@ class Reducer:
             if stop_action is not None and isinstance(new_action, stop_action):
                 return new_action
 
-    def _handle_action(self, new_action) -> None:
+    def _handle_action(self, new_action: Optional[BaseAction]) -> None:
         if new_action is None:
             return
+        active_callback_threads = []
         with self._lock:
             for trigger, callback in self._handlers:
-                # noinspection PyBroadException
-                try:
-                    if isinstance(new_action, trigger):
-                        callback(new_action)
-                except Exception:
-                    logger.exception('Exception occurred while handling reducer for: ' + str(callback))
+                if isinstance(new_action, trigger):
+                    t = threading.Thread(target=Reducer._handle_callback, args=(callback, new_action))
+                    t.start()
+                    active_callback_threads.append(t)
             # only register to history after handlers are done.
             self._history.append(new_action)
+        for t in active_callback_threads:
+            t.join()
+
+    @staticmethod
+    def _handle_callback(callback, new_action) -> None:
+        # noinspection PyBroadException
+        try:
+            callback(new_action)
+        except Exception:
+            logger.exception('Exception occurred while handling reducer for: ' + str(callback))
