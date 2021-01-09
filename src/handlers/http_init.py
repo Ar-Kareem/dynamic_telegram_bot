@@ -58,8 +58,11 @@ def call_appropriate_handler(self: MyHTTPHandler, method: str):
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
         return
+    path = self.path
+    if not path.endswith('/'):
+        path += '/'
     for prefix, handler in handlers:
-        if self.path.startswith(prefix):
+        if path.startswith(prefix):
             try:
                 handler(self)
             except Exception:
