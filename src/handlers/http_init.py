@@ -3,7 +3,7 @@ from functools import partial
 
 from src.core.actions import Terminate, AddServerHandler
 from src.core.start import Pocket
-from src.utils.simple_server import MyHTTPHandler, start_server, close_server
+from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server
 
 logger = logging.getLogger(__name__)
 pocket_dict_name = 'http_handler_dict'
@@ -22,8 +22,9 @@ def init(pocket: Pocket):
 
     # Attempt to start server at port given in config file
     server_port = int(pocket.config['SERVER']['port'])
+    use_ssl = pocket.config.getboolean('SERVER', 'SSL')
     try:
-        http_server = start_server(handler, port=server_port)
+        http_server = start_server(handler, port=server_port, ssl=use_ssl)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
 

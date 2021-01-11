@@ -3,3 +3,5 @@
 settings.ini
 *.pyc
 
+/src/utils/simple_server/fullchain1.pem
+/src/utils/simple_server/privkey1.pem

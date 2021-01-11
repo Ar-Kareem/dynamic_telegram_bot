@@ -39,7 +39,8 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
             self.logger.info(format_, *args)
 
 
-def start_server(handler: MyHTTPHandler, hostname: str = None, localhost: bool = False, port: int = 8049) -> HTTPServer:
+def start_server(handler: MyHTTPHandler, hostname: str = None,
+                 localhost: bool = False, port: int = 8049, ssl: bool = False) -> HTTPServer:
     if hostname is None:
         if localhost:
             hostname = 'localhost'
@@ -47,6 +48,10 @@ def start_server(handler: MyHTTPHandler, hostname: str = None, localhost: bool =
             hostname = socket.gethostname()
 
     webserver = HTTPServer((hostname, port), handler)
+    if ssl:
+        import ssl
+        webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=get_cert_path(),
+                                           keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
     thread.start()
@@ -58,8 +63,18 @@ def close_server(server: HTTPServer) -> None:
     server.server_close()
 
 
+def get_cert_path():
+    from pathlib import Path
+    return Path(__file__).parent / 'fullchain1.pem'
+
+
+def __get_key_path():
+    from pathlib import Path
+    return Path(__file__).parent / 'privkey1.pem'
+
+
 if __name__ == '__main__':
-    start_server(MyHTTPHandler())
+    start_server(MyHTTPHandler(), ssl=True)
     print('Waiting...')
     cond = threading.Condition()
     with cond:
