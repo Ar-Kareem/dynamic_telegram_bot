@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def init(pocket: Pocket):
-    if not pocket.config.getboolean('SERVER SSL CHALLENGE', 'start'):
+    if not pocket.config.getboolean('SERVER SSL CHALLENGE', 'start', fallback=False):
         return
     serve_location = pocket.config.get('SERVER SSL CHALLENGE', 'serve_location')
     pocket.store.dispatch(AddServerHandler('GET', serve_location, serve_challenge))

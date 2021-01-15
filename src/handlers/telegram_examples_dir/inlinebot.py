@@ -8,7 +8,6 @@ Basic inline bot example. Applies different text transformations.
 Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
-import configparser
 import logging
 import os
 from functools import partial
@@ -81,12 +80,7 @@ def init_bot_handlers(action: TelegramBotInitiated, pocket: Pocket):
 
 
 def init(pocket: Pocket):
-    try:
-        filename = os.path.basename(__file__).rstrip('.py')
-        activate = pocket.config.getboolean('TELEGRAM EXAMPLES', filename)
-    except configparser.NoOptionError:
-        activate = False
-        logger.warning('No Config option found for file %s, Skipping', __name__)
-    if activate:
+    filename = os.path.basename(__file__).rstrip('.py')
+    if pocket.config.getboolean('TELEGRAM EXAMPLES', filename, fallback=False):
         pocket.reducer.register_handler(trigger=TelegramBotInitiated,
                                         callback=partial(init_bot_handlers, pocket=pocket))

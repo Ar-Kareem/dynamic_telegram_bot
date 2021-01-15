@@ -10,7 +10,7 @@ pocket_dict_name = 'http_handler_dict'
 
 
 def init(pocket: Pocket):
-    if not pocket.config.getboolean('SERVER', 'start'):
+    if not pocket.config.getboolean('SERVER', 'start', fallback=False):
         return
     pocket.set(pocket_dict_name, {})
 
@@ -20,9 +20,8 @@ def init(pocket: Pocket):
     for func in (do_POST, do_GET):
         handler.bind(func)
 
-    # Attempt to start server at port given in config file
-    server_port = int(pocket.config['SERVER']['port'])
-    use_ssl = pocket.config.getboolean('SERVER', 'SSL')
+    server_port = pocket.config.getint('SERVER', 'port', fallback=8049)
+    use_ssl = pocket.config.getboolean('SERVER', 'SSL', fallback=False)
     try:
         http_server = start_server(handler, port=server_port, ssl=use_ssl)
     except Exception:

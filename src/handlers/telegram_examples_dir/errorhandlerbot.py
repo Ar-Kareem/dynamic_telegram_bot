@@ -1,7 +1,6 @@
 """
 This is a very simple example on how one could implement a custom error handler
 """
-import configparser
 import html
 import json
 import logging
@@ -80,12 +79,7 @@ def init_bot_handlers(action: TelegramBotInitiated, pocket: Pocket):
 
 
 def init(pocket: Pocket):
-    try:
-        filename = os.path.basename(__file__).rstrip('.py')
-        activate = pocket.config.getboolean('TELEGRAM EXAMPLES', filename)
-    except configparser.NoOptionError:
-        activate = False
-        logger.warning('No Config option found for file %s, Skipping', __name__)
-    if activate:
+    filename = os.path.basename(__file__).rstrip('.py')
+    if pocket.config.getboolean('TELEGRAM EXAMPLES', filename, fallback=False):
         pocket.reducer.register_handler(trigger=TelegramBotInitiated,
                                         callback=partial(init_bot_handlers, pocket=pocket))

@@ -73,7 +73,7 @@ def init_bot_handlers(action: BaseAction, pocket: Pocket):
 
 
 def init(pocket: Pocket):
-    if not pocket.config.getboolean('TELEGRAM', 'start'):
+    if not pocket.config.getboolean('TELEGRAM', 'start', fallback=False):
         return
 
     # init bot
