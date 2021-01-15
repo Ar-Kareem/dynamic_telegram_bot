@@ -1,23 +1,20 @@
-import configparser
 import logging
-import os
 from functools import partial
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
-    Updater,
     CommandHandler,
     CallbackQueryHandler,
     ConversationHandler,
     CallbackContext,
 )
 
-# Enable logging
 from src.core.actions import TelegramBotInitiated
 from src.core.pocket import Pocket
 from src.utils.utils import get_project_root
 
 logger = logging.getLogger(__name__)
+pocket_dict_name = 'inline_log.py'
 
 # Stages
 FIRST, SECOND = range(2)
@@ -34,53 +31,54 @@ keyboard = [
 reply_markup = InlineKeyboardMarkup(keyboard)
 
 
-def get_logs(reload=False, cache=[None]) -> [str, ...]:
-    if reload or cache[0] is None:
-        with open(get_project_root() / 'logs' / 'logs_debug.log', 'r') as f:
-            logfile = f.readlines()
-            cache[0] = ['[2021-' + i for i in '\n'.join(logfile).split('[2021-')]
-    return cache[0]
+def load_logs(pocket: Pocket):
+    with open(get_project_root() / 'logs' / 'logs_debug.log', 'r') as f:
+        logfile = f.readlines()
+        logfile = ['[2021-' + i for i in '\n'.join(logfile).split('[2021-')]
+        pocket.get(pocket_dict_name)['log'] = logfile
+        return logfile
+
+
+def get_logs(pocket: Pocket, pos: int = None, last_line=False) -> (str, int):
+    if pos is None:
+        if not last_line:
+            return 'Error fetching logs', None
+        log = load_logs(pocket)
+        return log[-1], len(log)-1
+    log = pocket.get(pocket_dict_name)['log']
+    if pos < 0:
+        return log[0], 0
+    if pos >= len(log):
+        log = load_logs(pocket)
+    if pos >= len(log):
+        return log[-1] + '\n\n[END OF FILE]', len(log)-1
+    return log[pos], pos
 
 
 def start(update: Update, context: CallbackContext) -> None:
-    logfile = get_logs()
-    current_pos = len(logfile) - 1
+    log_message, current_pos = get_logs(context.bot_data['pocket'], last_line=True)
     context.user_data['current_pos'] = current_pos
-    current_log = logfile[current_pos]
-    update.message.reply_text(current_log, reply_markup=reply_markup)
+    update.message.reply_text(log_message, reply_markup=reply_markup)
     return FIRST
 
 
 def up(update: Update, context: CallbackContext) -> None:
-    """Show new choice of buttons"""
-    query = update.callback_query
-    query.answer()
-    if context.user_data['current_pos'] > 0:
-        context.user_data['current_pos'] -= 1
-    current_log = get_logs()[context.user_data['current_pos']]
-    query.edit_message_text(text=current_log, reply_markup=reply_markup)
-    return FIRST
+    move(update, context, -1)
 
 
 def down(update: Update, context: CallbackContext) -> None:
-    """Show new choice of buttons"""
+    move(update, context, +1)
+
+
+def move(update: Update, context: CallbackContext, direction: int) -> None:
     query = update.callback_query
     query.answer()
-    logfile = get_logs()
-    if context.user_data['current_pos'] >= len(logfile) - 1:
-        logfile = get_logs(reload=True)
-
-    if context.user_data['current_pos'] < len(logfile) - 1:
-        context.user_data['current_pos'] += 1
-        result = logfile[context.user_data['current_pos']]
-    else:
-        result = 'END OF FILE'
-    query.edit_message_text(text=result, reply_markup=reply_markup)
+    log_message, current_pos = get_logs(context.bot_data['pocket'], pos=context.user_data['current_pos'] + direction)
+    context.user_data['current_pos'] = current_pos
+    if log_message != query.message.text:
+        query.edit_message_text(text=log_message, reply_markup=reply_markup)
     return FIRST
 
-
-def reload_file(update: Update, context: CallbackContext) -> None:
-    pass
 
 def stop(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
@@ -90,6 +88,7 @@ def stop(update: Update, context: CallbackContext) -> None:
 
 
 def init_bot_handlers(action: TelegramBotInitiated, pocket: Pocket):
+    pocket.set(pocket_dict_name, {})
     dispatcher = pocket.telegram_updater.dispatcher
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('logs', start)],
@@ -97,11 +96,10 @@ def init_bot_handlers(action: TelegramBotInitiated, pocket: Pocket):
             FIRST: [
                 CallbackQueryHandler(up, pattern='^' + str(UP) + '$'),
                 CallbackQueryHandler(down, pattern='^' + str(DOWN) + '$'),
-                CallbackQueryHandler(reload_file, pattern='^' + str(RELOAD_FILE) + '$'),
                 CallbackQueryHandler(stop, pattern='^' + str(STOP) + '$'),
             ],
         },
-        fallbacks=[CommandHandler('start', start)],
+        fallbacks=[CommandHandler('start', start)]
     )
     dispatcher.add_handler(conv_handler)
 
