@@ -19,7 +19,7 @@ def logs(update: Update, context: CallbackContext) -> None:
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
     dispatcher = pocket.telegram_updater.dispatcher
-    dispatcher.add_handler(CommandHandler("logs", logs))
+    dispatcher.add_handler(CommandHandler("logss", logs))
 
 
 def init(pocket: Pocket):

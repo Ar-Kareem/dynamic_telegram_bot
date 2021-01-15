@@ -9,8 +9,8 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
     This class can be used with an HTTPServer as if it is a BaseHTTPRequestHandler
     The difference is that an HTTPServer creates a new instance of BaseHTTPRequestHandler for every request
     which means that no variables can persist throughout the request handler instance.
-    This class helps with that by allowing it to be initialized then can store instance variables,
-    and each time httpserver attempts to initialize the request handler (__call__ will be invoked).
+    This class helps by allowing it to be initialized and be assigned instance variables,
+    whenever httpserver attempts to initialize the request handler (__call__ will be invoked).
     This only works because super().__init__ is safe to be invoked multiple times.
     This can be thought of as a metaclass except it's not.
     """
@@ -50,8 +50,8 @@ def start_server(handler: MyHTTPHandler, hostname: str = None,
     webserver = HTTPServer((hostname, port), handler)
     if ssl:
         import ssl
-        webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=get_cert_path(),
-                                           keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)
+        webserver.socket = ssl.wrap_socket(webserver.socket, certfile=get_cert_path(), keyfile=__get_key_path(),
+                                           server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
     thread.start()
@@ -73,9 +73,14 @@ def __get_key_path():
     return Path(__file__).parent / 'privkey1.pem'
 
 
+def main():
+    o = type('l', (), {'info': print})()
+    webserver = HTTPServer((socket.gethostname(), 8049), MyHTTPHandler(logger=o))
+    import ssl
+    webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=_get_cert_path(),
+                                       keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)
+    webserver.serve_forever()
+
+
 if __name__ == '__main__':
-    start_server(MyHTTPHandler(), ssl=True)
-    print('Waiting...')
-    cond = threading.Condition()
-    with cond:
-        cond.wait(threading.TIMEOUT_MAX)
+    main()

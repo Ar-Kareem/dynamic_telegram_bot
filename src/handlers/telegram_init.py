@@ -38,16 +38,17 @@ def nuke(update: Update, context: CallbackContext) -> None:
 
 
 def echo(update: Update, context: CallbackContext) -> None:
-    start_time = context.bot_data['pocket'].get('start_time')
-    update.message.reply_text(start_time + ' ' + update.message.text)
+    update.message.reply_text(update.message.text)
 
 
 # Action Handlers
 def handle_send_message(action: BaseAction, pocket: Pocket):
+    updater: Updater = pocket.telegram_updater
     if isinstance(action, TelegramMessageToMe):
-        pocket.telegram_updater.bot.send_message(chat_id=pocket.config['TELEGRAM']['my_chat_id'], text=action.message)
+        updater.bot.send_message(chat_id=pocket.config['TELEGRAM']['my_chat_id'], text=action.message,
+                                 disable_notification=True)
     elif isinstance(action, SendTelegramMessage):
-        pocket.telegram_updater.bot.send_message(chat_id=action.to, text=action.message)
+        updater.bot.send_message(chat_id=action.to, text=action.message)
 
 
 def finalize_bot(action: BaseAction, pocket: Pocket):
