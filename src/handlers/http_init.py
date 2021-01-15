@@ -26,6 +26,7 @@ def init(pocket: Pocket):
         http_server = start_server(handler, port=server_port, ssl=use_ssl)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
+        return
 
     # Register Handlers for adding functionality to the server and terminating the server
     pocket.reducer.register_handler(trigger=Terminate, callback=lambda _: close_server(http_server))
