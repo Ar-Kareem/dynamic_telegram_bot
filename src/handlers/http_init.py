@@ -69,6 +69,7 @@ def call_appropriate_handler(self: MyHTTPHandler, method: str):
             except Exception:
                 logger.exception('Exception when handling HTTP request')
             return
+    logger.info('%s %s %s %s', "Could not find handler for HTTP request path", path, "for method", method)
 
 
 def do_GET(self: MyHTTPHandler):
