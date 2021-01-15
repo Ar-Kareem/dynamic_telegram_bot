@@ -1,7 +1,7 @@
 /.idea
-/jupyter/.ipynb_checkpoints
 settings.ini
 *.pyc
 
+/jupyter/
 /logs/
 /src/utils/simple_server/*.pem
