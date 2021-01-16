@@ -39,7 +39,7 @@ def get_all_scripts(function_name_check: str, script_module_import_path: str = N
         script_module_path = get_handlers_path_relative()
 
     importlib.invalidate_caches()
-    script_names = [f.removesuffix('.py') for f in os.listdir(script_module_path) if f.endswith('.py')]
+    script_names = [f[:-3] for f in os.listdir(script_module_path) if f.endswith('.py')]
     module_list = []
 
     for sn in script_names:
