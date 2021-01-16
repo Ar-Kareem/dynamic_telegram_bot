@@ -1,4 +1,5 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.cookies import SimpleCookie
 import threading
 import socket
 from logging import Logger
@@ -38,6 +39,16 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         if self.logger is not None:
             self.logger.info(format_, *args)
 
+    def read_simple_cookie(self) -> SimpleCookie:
+        sc = SimpleCookie()
+        if self.headers.get('Cookie') is not None:
+            sc.load(self.headers.get('Cookie'))
+        return sc
+
+    def set_simple_cookie(self, sc: SimpleCookie) -> None:
+        for morsel in sc.values():
+            self.send_header("Set-Cookie", morsel.OutputString())
+
 
 def start_server(handler: MyHTTPHandler, hostname: str = None,
                  localhost: bool = False, port: int = 8049, ssl: bool = False) -> HTTPServer:
@@ -50,7 +61,7 @@ def start_server(handler: MyHTTPHandler, hostname: str = None,
     webserver = HTTPServer((hostname, port), handler)
     if ssl:
         import ssl
-        webserver.socket = ssl.wrap_socket(webserver.socket, certfile=get_cert_path(), keyfile=__get_key_path(),
+        webserver.socket = ssl.wrap_socket(webserver.socket, certfile=_get_cert_path(), keyfile=__get_key_path(),
                                            server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
@@ -63,7 +74,7 @@ def close_server(server: HTTPServer) -> None:
     server.server_close()
 
 
-def get_cert_path():
+def _get_cert_path():
     from pathlib import Path
     return Path(__file__).parent / 'fullchain1.pem'
 
