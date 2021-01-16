@@ -72,6 +72,7 @@ def telegram(update: Update, context: CallbackContext) -> None:
         if entity.type == MessageEntity.URL:
             a, b = entity.offset, entity.offset+entity.length
             url = update.effective_message.text[a:b]
+            url = url if url.startswith('http') else 'http://' + url
             break
     else:
         update.effective_message.reply_text('no url found')
