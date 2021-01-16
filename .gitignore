@@ -5,3 +5,4 @@ settings.ini
 /jupyter/
 /logs/
 /src/utils/simple_server/*.pem
+/src/handlers/serve_pdf/output/
