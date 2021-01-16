@@ -76,15 +76,19 @@ def telegram(update: Update, context: CallbackContext) -> None:
     else:
         update.effective_message.reply_text('no url found')
         return
-    update.effective_message.reply_text('url found: %s. Downloading...' % url)
-    helper.download(url)
-    update.effective_message.reply_text('Downloaded. Converting to images')
-    helper.generate_images()
-    update.effective_message.reply_text('Done. Number of pages: %d. Saving to disk...' % helper.get_number_of_pages())
-    helper.save_images_to_files()
-    # update.effective_message.reply_text('Done. Link: %s' % helper.get_page_path(page_num=0))
-    website_url = pocket.config.get('SERVER', 'url', fallback='')
-    update.effective_message.reply_text(f'Done. Link: {website_url}/pdf/page/0')
+    try:
+        update.effective_message.reply_text('url found: %s. Downloading...' % url)
+        helper.download(url)
+        update.effective_message.reply_text('Downloaded. Converting to images')
+        helper.generate_images()
+        update.effective_message.reply_text('Done. Number of pages: %d. Saving to disk...' % helper.get_number_of_pages())
+        helper.save_images_to_files()
+        # update.effective_message.reply_text('Done. Link: %s' % helper.get_page_path(page_num=0))
+        website_url = pocket.config.get('SERVER', 'url', fallback='')
+        update.effective_message.reply_text(f'Done. Link: {website_url}/pdf/page/0')
+    except Exception:
+        logger.exception('Error while serving PDF.')
+        update.effective_message.reply_text('Error occured. Check logs.')
 
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
