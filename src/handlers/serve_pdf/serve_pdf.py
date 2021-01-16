@@ -83,7 +83,8 @@ def telegram(update: Update, context: CallbackContext) -> None:
     update.effective_message.reply_text('Done. Number of pages: %d. Saving to disk...' % helper.get_number_of_pages())
     helper.save_images_to_files()
     # update.effective_message.reply_text('Done. Link: %s' % helper.get_page_path(page_num=0))
-    update.effective_message.reply_text('Done. Link: https://home.abdulrahman-kareem.com/pdf/page/0')
+    website_url = pocket.config.get('SERVER', 'url', fallback='')
+    update.effective_message.reply_text(f'Done. Link: {website_url}/pdf/page/0')
 
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
