@@ -78,15 +78,15 @@ def telegram(update: Update, context: CallbackContext) -> None:
         update.effective_message.reply_text('no url found')
         return
     try:
-        update.effective_message.reply_text('url found: %s. Downloading...' % url)
+        message_to_user = update.effective_message.reply_text('1/4 - url found: %s. Downloading...' % url)
         helper.download(url)
-        update.effective_message.reply_text('Downloaded. Converting to images')
+        message_to_user.edit_text('2/4 - Downloaded. Converting to images...')
         helper.generate_images()
-        update.effective_message.reply_text('Done. Number of pages: %d. Saving to disk...' % helper.get_number_of_pages())
+        message_to_user.edit_text('3/4 - Converted. Number of pages: %d. Saving to disk...'
+                                  % helper.get_number_of_pages())
         helper.save_images_to_files()
-        # update.effective_message.reply_text('Done. Link: %s' % helper.get_page_path(page_num=0))
         website_url = pocket.config.get('SERVER', 'url', fallback='')
-        update.effective_message.reply_text(f'Done. Link: {website_url}/pdf/page/0')
+        message_to_user.edit_text(f'Done. Link: {website_url}/pdf/page/0')
     except Exception:
         logger.exception('Error while serving PDF.')
         update.effective_message.reply_text('Error occured. Check logs.')
