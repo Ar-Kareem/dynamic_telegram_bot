@@ -22,8 +22,9 @@ def init(pocket: Pocket):
 
     server_port = pocket.config.getint('SERVER', 'port', fallback=8049)
     use_ssl = pocket.config.getboolean('SERVER', 'SSL', fallback=False)
+    timeout = pocket.config.getfloat('SERVER', 'timeout', fallback=None)
     try:
-        http_server = start_server(handler, port=server_port, ssl=use_ssl)
+        http_server = start_server(handler, port=server_port, ssl=use_ssl, timeout=timeout)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
         return

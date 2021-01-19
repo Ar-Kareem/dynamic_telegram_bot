@@ -1,8 +1,14 @@
+#!/usr/bin/env python3
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.cookies import SimpleCookie
 import threading
 import socket
+import logging
 from logging import Logger
+
+
+logger = logging.getLogger(__name__)
 
 
 class MyHTTPHandler(BaseHTTPRequestHandler):
@@ -51,14 +57,18 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
 
 
 def start_server(handler: MyHTTPHandler, hostname: str = None,
-                 localhost: bool = False, port: int = 8049, ssl: bool = False) -> HTTPServer:
+                 localhost: bool = False, port: int = 8049, ssl: bool = False, timeout: int = None) -> HTTPServer:
     if hostname is None:
         if localhost:
             hostname = 'localhost'
         else:
             hostname = socket.gethostname()
 
+    if timeout is not None:
+        __set_timeout(timeout)
+
     webserver = HTTPServer((hostname, port), handler)
+
     if ssl:
         import ssl
         webserver.socket = ssl.wrap_socket(webserver.socket, certfile=_get_cert_path(), keyfile=__get_key_path(),
@@ -84,12 +94,28 @@ def __get_key_path():
     return Path(__file__).parent / 'privkey1.pem'
 
 
+# need to warn user if timeout is set multiple times since socket default timeout only supports single value overall
+__timeout_has_been_set = False
+__timeout_value = 0
+
+
+def __set_timeout(timeout):
+    socket.setdefaulttimeout(timeout)
+    global __timeout_has_been_set, __timeout_value
+    if __timeout_has_been_set and __timeout_value != timeout:
+        logger.warning("timeout has been set multiple times. Overwriting and only taking latest value. "
+                       "(no support for multiple servers with different timeouts)")
+    __timeout_has_been_set = True
+    __timeout_value = timeout
+
+
 def main():
-    o = type('l', (), {'info': print})()
-    webserver = HTTPServer((socket.gethostname(), 8049), MyHTTPHandler(logger=o))
-    import ssl
-    webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=_get_cert_path(),
-                                       keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)
+    makeshift_logger = type('l', (), {'info': print})()
+    # webserver = HTTPServer((socket.gethostname(), 8092), MyHTTPHandler(logger=makeshift_logger))
+    webserver = HTTPServer(('0.0.0.0', 8091), MyHTTPHandler(logger=makeshift_logger))
+    # import ssl
+    # webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=_get_cert_path(),
+    #                                    keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)
     webserver.serve_forever()
 
 
