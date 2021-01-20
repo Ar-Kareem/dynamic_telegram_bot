@@ -1,6 +1,6 @@
 import logging
 from functools import partial
-from typing import Optional
+from typing import Optional, Callable
 from urllib import request
 from pathlib import Path
 
@@ -35,8 +35,8 @@ class _Helper:
         self.pages = [0]*22
         self.converted_to_files = True
 
-    def download(self, url: str) -> None:
-        request.urlretrieve(url, self.output_pdf_path)
+    def download(self, url: str, reporthook: Callable[[int, int, int], None] = None) -> None:
+        request.urlretrieve(url, filename=self.output_pdf_path, reporthook=reporthook)
         self.pages = None
         self.converted_to_files = False
 
@@ -78,8 +78,21 @@ def telegram(update: Update, context: CallbackContext) -> None:
         update.effective_message.reply_text('no url found')
         return
     try:
-        message_to_user = update.effective_message.reply_text('1/4 - url found: %s. Downloading...' % url)
-        helper.download(url)
+        msg = '1/4 - url found: %s. Downloading...' % url
+        message_to_user = update.effective_message.reply_text(msg)
+
+        import math
+        import time
+        def reporthook(a, b, c, last_telegram_update_time=[0.0], last_telegram_update_percent=[-1]):
+            percent_done = int(50*a / math.ceil(c / b))
+            percent_left = 50-percent_done
+            if last_telegram_update_time[-1] + 0.5 < time.time() and last_telegram_update_percent[-1] != percent_done:
+                last_telegram_update_time.append(time.time())
+                last_telegram_update_percent.append(percent_done)
+                message_to_user.edit_text(msg +
+                                          '\n' + (percent_done*'+') + (percent_left*'~') + f' ({2*percent_done} %)')
+
+        helper.download(url, reporthook=reporthook)
         message_to_user.edit_text('2/4 - Downloaded. Converting to images...')
         helper.generate_images()
         message_to_user.edit_text('3/4 - Converted. Number of pages: %d. Saving to disk...'
