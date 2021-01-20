@@ -21,13 +21,20 @@ def get_handlers_import_path_relative() -> str:
     return 'src.handlers'
 
 
-def init_config() -> ConfigParser:
+def init_config(config_path=None) -> ConfigParser:
     try:
         config = ConfigParser()
-        config.read('settings.ini')
+        if config_path is None:
+            config.read('settings.ini')
+        else:
+            config.read(config_path)
+
+        if len(config.sections()) == 0:
+            raise FileNotFoundError('No sections found in settings.ini file: (%s)' % config_path)
+
         return config
     except Exception:
-        logger.exception('Failed to load settings.ini file. Terminating')
+        logger.exception('Failed to load settings .ini file: (%s). Terminating' % config_path)
         raise
 
 

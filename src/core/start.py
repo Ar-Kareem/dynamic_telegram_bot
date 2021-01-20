@@ -10,9 +10,9 @@ from src.core.pocket import Pocket
 logger = logging.getLogger(__name__)
 
 
-def start():
+def start(config_path=None):
     init_logger()
-    pocket = Pocket()
+    pocket = Pocket(config_path=config_path)
     init_scripts(pocket)
     reducer_loop(pocket)
 

@@ -1,4 +1,8 @@
+import argparse
 from src.core import start
 
 if __name__ == '__main__':
-    start.start()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--settings", help="Custom settings.ini file")
+    config_path = parser.parse_args().settings
+    start.start(config_path=config_path)

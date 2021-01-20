@@ -6,10 +6,10 @@ from src.utils.affiliates import Store, Reducer
 
 
 class Pocket:
-    def __init__(self):
+    def __init__(self, config_path=None):
         self.store = Store()
         self.reducer = Reducer(store=self.store)
-        self.config = utils.init_config()
+        self.config = utils.init_config(config_path=config_path)
 
         self.active_threads: list[Thread] = []
         self.inner_pocket: dict[str, any] = {}
