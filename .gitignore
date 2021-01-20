@@ -7,3 +7,4 @@ settings_WSL.ini
 /logs/
 /src/utils/simple_server/*.pem
 /src/handlers/serve_pdf/output/
+/src/handlers/telegram_only/tracker.txt
