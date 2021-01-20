@@ -62,7 +62,8 @@ def start_server(handler: MyHTTPHandler, hostname: str = None,
         if localhost:
             hostname = 'localhost'
         else:
-            hostname = socket.gethostname()
+            # don't used socket.gethostname(), will not work on wsl for some reason. '' is 0.0.0.0
+            hostname = ''
 
     if timeout is not None:
         __set_timeout(timeout)
