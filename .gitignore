@@ -1,6 +1,7 @@
 /.idea
-settings.ini
 *.pyc
+settings.ini
+settings_WSL.ini
 
 /jupyter/
 /logs/
