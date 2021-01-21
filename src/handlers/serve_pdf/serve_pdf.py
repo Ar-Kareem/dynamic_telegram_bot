@@ -32,8 +32,8 @@ class _Helper:
         # Create output directory
         self.output_dir_path.mkdir(exist_ok=True)
 
-        self.pages = [0]*22
-        self.converted_to_files = True
+        self.pages = []
+        self.converted_to_files = False
 
     def download(self, url: str, reporthook: Callable[[int, int, int], None] = None) -> None:
         request.urlretrieve(url, filename=self.output_pdf_path, reporthook=reporthook)
