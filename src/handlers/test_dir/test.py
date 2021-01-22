@@ -2,12 +2,11 @@ import json
 import logging
 from functools import partial
 from threading import Timer
-from pathlib import Path
 from http import cookies
 from time import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CallbackContext
 
 from src.core.actions import TelegramBotInitiated, AddServerHandler, TelegramMessageToMe, Terminate
 from src.core.start import Pocket
@@ -40,7 +39,6 @@ def init(pocket: Pocket):
     pocket.store.dispatch(AddServerHandler('get', '/index/', get_index))
     pocket.store.dispatch(AddServerHandler('get', '/reset/', get_handler))
     pocket.store.dispatch(AddServerHandler('get', '/error/', get_handler))
-    pocket.store.dispatch(AddServerHandler('get', '/favicon.ico/', serve_favicon))
     pocket.store.dispatch(AddServerHandler('get', '/testcookie/', test_cookie))
 
     # pocket.store.dispatch(AddServerHandler('post', '/', test_post_handler))
@@ -86,14 +84,6 @@ def test_post_handler(self: MyHTTPHandler):
     self.data_string = self.rfile.read(content_length)
     js_data = json.loads(self.data_string)
     self.pocket.store.dispatch(TelegramMessageToMe(message='POST' + js_data))
-
-
-def serve_favicon(self: MyHTTPHandler):
-    self.send_response(200)
-    self.send_header('Content-type', 'image/png')
-    self.end_headers()
-    with open(Path(__file__).parent / 'favicon.ico', 'rb') as f:
-        self.wfile.write(f.read())
 
 
 def test_cookie(self: MyHTTPHandler):
