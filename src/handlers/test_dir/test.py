@@ -3,6 +3,8 @@ import logging
 from functools import partial
 from threading import Timer
 from pathlib import Path
+from http import cookies
+from time import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
@@ -34,11 +36,12 @@ def init(pocket: Pocket):
     pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
 
     # pocket.store.dispatch(AddServerHandler('post', '/error', lambda s: print('hello')))
-    pocket.store.dispatch(AddServerHandler('post', '/tasker/image/', get_handler))
+    pocket.store.dispatch(AddServerHandler('post', '/tasker/image/', test_post_handler))
     pocket.store.dispatch(AddServerHandler('get', '/index/', get_index))
     pocket.store.dispatch(AddServerHandler('get', '/reset/', get_handler))
     pocket.store.dispatch(AddServerHandler('get', '/error/', get_handler))
     pocket.store.dispatch(AddServerHandler('get', '/favicon.ico/', serve_favicon))
+    pocket.store.dispatch(AddServerHandler('get', '/testcookie/', test_cookie))
 
     # pocket.store.dispatch(AddServerHandler('post', '/', test_post_handler))
 
@@ -87,8 +90,37 @@ def test_post_handler(self: MyHTTPHandler):
 
 def serve_favicon(self: MyHTTPHandler):
     self.send_response(200)
-    # self.send_header('Content-type', 'application/notepad')
-    self.send_header('Content-Disposition', 'attachment; filename="favicon.ico"')
+    self.send_header('Content-type', 'image/png')
     self.end_headers()
     with open(Path(__file__).parent / 'favicon.ico', 'rb') as f:
         self.wfile.write(f.read())
+
+
+def test_cookie(self: MyHTTPHandler):
+    self.send_response(200)
+    self.send_header("Content-type", "text/html")
+
+    c = self.read_simple_cookie()
+    print(c, c['t'] if 't' in c else None)
+    c = cookies.SimpleCookie()
+    t = str(time())
+    c[t] = '44'
+    c[t]['max-age'] = 4
+    c['t'] = '44'
+    c['t']['max-age'] = 4
+    self.set_simple_cookie(c)
+    self.end_headers()
+
+    favicon = '<img src="/favicon.ico" alt="testtt" style="width:50px;height:50px;">'
+    divfavicon = f'<div>{favicon*15}</div>'
+    html = f''' 
+    <html>
+    <body>
+        <div style="white-space: pre-line;">
+            {str(self.headers)}
+        </div>
+        {divfavicon*15}
+    </body>
+    </html>
+    '''
+    self.wfile.write(bytes(html, "utf-8"))
