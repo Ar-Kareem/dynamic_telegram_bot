@@ -56,7 +56,8 @@ def get_all_scripts(function_name_check: str, script_module_import_path: str = N
             if hasattr(module, function_name_check) and callable(getattr(module, function_name_check)):
                 module_list.append(module)
             else:
-                logger.warning('Dynamically imported script "' + sn + '.py" has no callable ' + function_name_check)
+                # logger.warning('Dynamically imported script "' + sn + '.py" has no callable ' + function_name_check)
+                pass
         except Exception as e:
             logger.error('Error occurred while dynamically importing script "' + sn + '.py"', exc_info=e)
 
