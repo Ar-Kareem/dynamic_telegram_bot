@@ -14,7 +14,6 @@ from src.core.pocket import Pocket
 from src.utils.utils import get_project_root
 
 logger = logging.getLogger(__name__)
-pocket_dict_name = 'inline_log.py'
 
 # Stages
 FIRST, SECOND = range(2)
@@ -35,7 +34,7 @@ def load_logs(pocket: Pocket):
     with open(get_project_root() / 'logs' / 'logs_debug.log', 'r') as f:
         logfile = f.readlines()
         logfile = ['[2021-' + i for i in '\n'.join(logfile).split('[2021-')]
-        pocket.get(pocket_dict_name)['log'] = logfile
+        pocket.get(__name__)['log'] = logfile
         return logfile
 
 
@@ -45,7 +44,7 @@ def get_logs(pocket: Pocket, pos: int = None, last_line=False) -> (str, int):
             return 'Error fetching logs', None
         log = load_logs(pocket)
         return log[-1], len(log)-1
-    log = pocket.get(pocket_dict_name)['log']
+    log = pocket.get(__name__)['log']
     if pos < 0:
         return log[0], 0
     if pos >= len(log):
@@ -88,7 +87,7 @@ def stop(update: Update, context: CallbackContext) -> None:
 
 
 def init_bot_handlers(action: TelegramBotInitiated, pocket: Pocket):
-    pocket.set(pocket_dict_name, {})
+    pocket.set(__name__, {})
     dispatcher = pocket.telegram_updater.dispatcher
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('logs', start)],

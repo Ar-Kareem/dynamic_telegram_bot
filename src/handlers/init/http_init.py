@@ -6,13 +6,12 @@ from src.core.start import Pocket
 from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server
 
 logger = logging.getLogger(__name__)
-pocket_dict_name = 'http_handler_dict'
 
 
 def init(pocket: Pocket):
     if not pocket.config.getboolean('SERVER', 'start', fallback=False):
         return
-    pocket.set(pocket_dict_name, {})
+    pocket.set(__name__, {})
 
     # create HTTP Handler and bind functionality to it
     handler = MyHTTPHandler(logger=logger)
@@ -36,7 +35,7 @@ def init(pocket: Pocket):
 
 def add_server_handler(action: AddServerHandler, pocket: Pocket):
     """This is called when an AddServerHandler action is dispatched and this function will add a new HTTP Handler"""
-    module_dict: dict = pocket.get(pocket_dict_name)
+    module_dict: dict = pocket.get(__name__)
     method = action.method.upper()
     if method not in ('POST', 'GET'):
         logger.error('UNKNOWN METHOD: %s', method)
@@ -53,7 +52,7 @@ def add_server_handler(action: AddServerHandler, pocket: Pocket):
 # Methods to be bound to MyHTTPHandler
 
 def call_appropriate_handler(self: MyHTTPHandler, method: str):
-    module_dict: dict = self.pocket.get(pocket_dict_name)
+    module_dict: dict = self.pocket.get(__name__)
     handlers = module_dict.get(method)
     if handlers is None:
         self.send_response(200)
