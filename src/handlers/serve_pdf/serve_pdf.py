@@ -3,6 +3,7 @@ from functools import partial
 from typing import Optional, Callable
 from urllib import request
 from pathlib import Path
+import os
 
 from telegram import Update, MessageEntity
 from telegram.ext import CommandHandler, CallbackContext
@@ -23,45 +24,66 @@ from src.core.start import Pocket
 logger = logging.getLogger(__name__)
 
 
+def init(pocket: Pocket):
+    try:
+        import pdf2image
+    except ImportError:
+        logger.info('Cannot import pdf2image. Skipping %s. Try: pip install pdf2image', __name__)
+        return
+
+    helper = _Helper(output_dir_name='output')
+    pocket.set(__name__, helper)
+    pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
+    pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', get_pdf_page))
+    pocket.store.dispatch(AddServerHandler('get', '/pdf/image/', get_pdf_image))
+
+
+def init_bot_handlers(action: BaseAction, pocket: Pocket):
+    dispatcher = pocket.telegram_updater.dispatcher
+    dispatcher.add_handler(CommandHandler("pdf", telegram))
+
+
 class _Helper:
     def __init__(self, output_dir_name):
-        self.output_dir_name = output_dir_name
-        self.output_dir_path = Path(__file__).parent / self.output_dir_name
-        self.output_pdf_path = self.output_dir_path / 'output.pdf'
-        self.output_image_name = 'out_%d.jpg'
+        self.output_dir_path = Path(__file__).parent / output_dir_name
+        self.output_pdf_name = 'output.pdf'
+        self.output_image_name = '%d.jpg'
         # Create output directory
         self.output_dir_path.mkdir(exist_ok=True)
 
-        self.pages = []
-        self.converted_to_files = False
+    def _get_next_id(self):
+        dir_names = sorted(next(os.walk(self.output_dir_path))[1])
+        next_valid_id = 1
+        for name in dir_names:
+            if name == str(next_valid_id):
+                next_valid_id += 1
 
-    def download(self, url: str, reporthook: Callable[[int, int, int], None] = None) -> None:
-        request.urlretrieve(url, filename=self.output_pdf_path, reporthook=reporthook)
-        self.pages = None
-        self.converted_to_files = False
+        return str(next_valid_id)
 
-    def generate_images(self, dpi=200) -> None:
-        self.pages = convert_from_path(self.output_pdf_path, dpi)
+    def download(self, url: str, reporthook: Callable[[int, int, int], None] = None) -> str:
+        next_id = self._get_next_id()
+        dir_path = self.output_dir_path / next_id
+        dir_path.mkdir()
+        pdf_path = dir_path / self.output_pdf_name
 
-    def save_images_to_files(self) -> None:
-        if self.pages is None:
-            return
-        for i, page in enumerate(self.pages):
+        request.urlretrieve(url, filename=pdf_path, reporthook=reporthook)
+        return next_id
+
+    def generate_images(self, dir_id: str, dpi=200):
+        pdf_path = self.output_dir_path / dir_id / self.output_pdf_name
+        return convert_from_path(pdf_path, dpi)
+
+    def save_images_to_files(self, dir_id: str, pages) -> None:
+        dir_path = self.output_dir_path / dir_id
+        for i, page in enumerate(pages):
             current_out_name = self.output_image_name % i
-            page.save(self.output_dir_path / current_out_name, 'JPEG')
-        self.converted_to_files = True
+            page.save(dir_path / current_out_name, 'JPEG')
 
-    def get_number_of_pages(self) -> Optional[int]:
-        if self.pages is None:
-            return None
-        return len(self.pages)
+    def get_number_of_pages(self, dir_id: int) -> Optional[int]:
+        return len(os.listdir(self.output_dir_path / dir_id)) - 1
 
-    def get_page_path(self, page_num):
-        if self.pages is None or not self.converted_to_files:
-            return
-        if 0 <= page_num < len(self.pages):
-            return self.output_dir_path / (self.output_image_name % page_num)
-        return
+    def get_page_path(self, dir_id: str, page_num: int):
+        return self.output_dir_path / dir_id / (self.output_image_name % page_num)
 
 
 def telegram(update: Update, context: CallbackContext) -> None:
@@ -83,8 +105,9 @@ def telegram(update: Update, context: CallbackContext) -> None:
 
         import math
         import time
+
         def reporthook(a, b, c, last_telegram_update_time=[0.0], last_telegram_update_percent=[-1]):
-            percent_done = int(50*a / math.ceil(c / b))
+            percent_done = int(50*a / math.ceil((c if c > 0 else 1) / (b if b > 0 else 1)))
             percent_left = 50-percent_done
             if last_telegram_update_time[-1] + 0.5 < time.time() and last_telegram_update_percent[-1] != percent_done:
                 last_telegram_update_time.append(time.time())
@@ -92,47 +115,30 @@ def telegram(update: Update, context: CallbackContext) -> None:
                 message_to_user.edit_text(msg +
                                           '\n' + (percent_done*'+') + (percent_left*'~') + f' ({2*percent_done} %)')
 
-        helper.download(url, reporthook=reporthook)
+        pdf_id = helper.download(url, reporthook=reporthook)
         message_to_user.edit_text('2/4 - Downloaded. Converting to images...')
-        helper.generate_images()
-        message_to_user.edit_text('3/4 - Converted. Number of pages: %d. Saving to disk...'
-                                  % helper.get_number_of_pages())
-        helper.save_images_to_files()
+        images = helper.generate_images(pdf_id)
+        message_to_user.edit_text('3/4 - Converted. Number of pages: %d. Saving to disk...' % len(images))
+        helper.save_images_to_files(pdf_id, images)
         website_url = pocket.config.get('SERVER', 'url', fallback='')
-        message_to_user.edit_text(f'Done. Link: {website_url}/pdf/page/0')
+        message_to_user.edit_text(f'Done (id: {pdf_id}). Link: {website_url}/pdf/page/{pdf_id}/0')
     except Exception:
         logger.exception('Error while serving PDF.')
-        update.effective_message.reply_text('Error occured. Check logs.')
-
-
-def init_bot_handlers(action: BaseAction, pocket: Pocket):
-    dispatcher = pocket.telegram_updater.dispatcher
-    dispatcher.add_handler(CommandHandler("pdf", telegram))
-
-
-def init(pocket: Pocket):
-    try:
-        import pdf2image
-    except ImportError:
-        logger.info('Cannot import pdf2image. Skipping %s. Try: pip install pdf2image', __name__)
-        return
-
-    helper = _Helper(output_dir_name='output')
-    pocket.set(__name__, helper)
-    pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
-    pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', get_pdf_page))
-    pocket.store.dispatch(AddServerHandler('get', '/pdf/image/', get_pdf_image))
+        update.effective_message.reply_text('Error occurred. Check logs.')
 
 
 def get_pdf_page(self: MyHTTPHandler):
     try:
-        digit = int(self.path.split('/')[3])
-    except Exception:
+        pdf_id = int(self.path.split('/')[3])
+        pdf_id = str(pdf_id)
+        page_num = int(self.path.split('/')[4])
+    except Exception as ex:
+        logger.error(ex)
         self.send_response(403)
         self.end_headers()
         return
     helper: _Helper = self.pocket.get(__name__)
-    page_path = helper.get_page_path(digit)
+    page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
         self.send_response(403)
         self.end_headers()
@@ -143,11 +149,11 @@ def get_pdf_page(self: MyHTTPHandler):
     self.send_header("Content-type", "text/html")
     self.end_headers()
 
-    prev_page_button = f'<a href="/pdf/page/{digit-1}" class="button green">Prev</a>' if digit > 0 else ''
-    next_page_button = f'<a href="/pdf/page/{digit+1}" class="button blue">Next</a>' \
-        if digit < helper.get_number_of_pages()-1 else ''
+    prev_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num-1}" class="button green">Prev</a>' if page_num > 0 else ''
+    next_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num+1}" class="button blue">Next</a>' \
+        if page_num < helper.get_number_of_pages(pdf_id)-1 else ''
 
-    img = f'<img src="/pdf/image/{digit}" >'  # style="width:50px;height:50px;"
+    img = f'<img src="/pdf/image/{pdf_id}/{page_num}" >'  # style="width:50px;height:50px;"
     html = ''' 
     <html>
     <head>
@@ -186,13 +192,15 @@ def get_pdf_page(self: MyHTTPHandler):
 
 def get_pdf_image(self: MyHTTPHandler):
     try:
-        digit = int(self.path.split('/')[3])
+        pdf_id = int(self.path.split('/')[3])
+        pdf_id = str(pdf_id)
+        page_num = int(self.path.split('/')[4])
     except Exception:
         self.send_response(403)
         self.end_headers()
         return
     helper: _Helper = self.pocket.get(__name__)
-    page_path = helper.get_page_path(digit)
+    page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
         self.send_response(403)
         self.end_headers()
@@ -202,4 +210,3 @@ def get_pdf_image(self: MyHTTPHandler):
     self.end_headers()
     with open(page_path, 'rb') as f:
         self.wfile.write(f.read())
-
