@@ -2,6 +2,8 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.cookies import SimpleCookie
+import os
+from pathlib import Path
 import threading
 import socket
 import logging
@@ -86,13 +88,19 @@ def close_server(server: HTTPServer) -> None:
 
 
 def _get_cert_path():
-    from pathlib import Path
-    return Path(__file__).parent / 'fullchain1.pem'
+    pem_files = Path(__file__).parent / 'ssl' / 'pem_files'
+    website_dir = pem_files / os.listdir(pem_files)[0]
+    pem_files = os.listdir(website_dir)
+    fullchain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]
+    return website_dir / fullchain
 
 
 def __get_key_path():
-    from pathlib import Path
-    return Path(__file__).parent / 'privkey1.pem'
+    pem_files = Path(__file__).parent / 'ssl' / 'pem_files'
+    website_dir = pem_files / os.listdir(pem_files)[0]
+    pem_files = os.listdir(website_dir)
+    privkey = sorted([f for f in pem_files if f.startswith('privkey')])[-1]
+    return website_dir / privkey
 
 
 # need to warn user if timeout is set multiple times since socket default timeout only supports single value overall

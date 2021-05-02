@@ -5,6 +5,6 @@ settings_WSL.ini
 
 /jupyter/
 /logs/
-/src/utils/simple_server/*.pem
+/src/utils/simple_server/ssl
 /src/handlers/serve_pdf/output/
 /src/handlers/telegram_only/tracker.txt
