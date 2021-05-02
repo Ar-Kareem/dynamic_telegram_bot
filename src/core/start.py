@@ -8,11 +8,18 @@ from src.utils import utils
 from src.core.pocket import Pocket
 
 logger = logging.getLogger(__name__)
+__config_path = None  # to preserve config_path upon restarts
 
 
 def start(config_path=None):
     init_logger()
-    pocket = Pocket(config_path=config_path)
+    global __config_path
+    __config_path = config_path
+    _start_after_init()
+
+
+def _start_after_init():
+    pocket = Pocket(config_path=__config_path)
     init_scripts(pocket)
     reducer_loop(pocket)
 
@@ -49,7 +56,7 @@ def reducer_loop(pocket: Pocket):
     try:
         last_action: Terminate = pocket.reducer.start(stop_action=Terminate)
         if last_action.reset_flag:
-            Thread(target=start).start()
+            Thread(target=_start_after_init).start()
     except KeyboardInterrupt:
         pocket.store.dispatch(Terminate())
         pocket.reducer.start(stop_action=Terminate)  # need handle the terminate action just dispatched
