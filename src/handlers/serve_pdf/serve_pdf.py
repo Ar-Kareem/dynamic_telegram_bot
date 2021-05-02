@@ -48,6 +48,8 @@ class _Helper:
         self.output_dir_path = Path(__file__).parent / output_dir_name
         self.output_pdf_name = 'output.pdf'
         self.output_image_name = '%d.jpg'
+        self.pdf_len_cache = {}  # cache lengths instead of scanning os each time
+
         # Create output directory
         self.output_dir_path.mkdir(exist_ok=True)
 
@@ -80,7 +82,9 @@ class _Helper:
             page.save(dir_path / current_out_name, 'JPEG')
 
     def get_number_of_pages(self, dir_id: int) -> Optional[int]:
-        return len(os.listdir(self.output_dir_path / dir_id)) - 1
+        if dir_id not in self.pdf_len_cache:
+            self.pdf_len_cache[dir_id] = len(os.listdir(self.output_dir_path / dir_id)) - 1
+        return self.pdf_len_cache[dir_id]
 
     def get_page_path(self, dir_id: str, page_num: int):
         return self.output_dir_path / dir_id / (self.output_image_name % page_num)
