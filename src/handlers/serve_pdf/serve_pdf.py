@@ -34,8 +34,9 @@ def init(pocket: Pocket):
     helper = _Helper(output_dir_name='output')
     pocket.set(__name__, helper)
     pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
-    pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', get_pdf_page))
+    pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', get_pdf_html_page))
     pocket.store.dispatch(AddServerHandler('get', '/pdf/image/', get_pdf_image))
+    pocket.store.dispatch(AddServerHandler('get', '/pdf/raw/', get_raw_pdf))
 
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
@@ -50,7 +51,7 @@ class _Helper:
         self.output_image_name = '%d.jpg'
         self.pdf_len_cache = {}  # cache lengths instead of scanning os each time
 
-        # Create output directory
+        # Create output directory if not exists
         self.output_dir_path.mkdir(exist_ok=True)
 
     def _get_next_id(self):
@@ -59,27 +60,20 @@ class _Helper:
         for name in dir_names:
             if name == str(next_valid_id):
                 next_valid_id += 1
-
         return str(next_valid_id)
 
     def download(self, url: str, reporthook: Callable[[int, int, int], None] = None) -> str:
         next_id = self._get_next_id()
-        dir_path = self.output_dir_path / next_id
-        dir_path.mkdir()
-        pdf_path = dir_path / self.output_pdf_name
-
+        pdf_path = self.get_pdf_path(next_id, make_dir=True)
         request.urlretrieve(url, filename=pdf_path, reporthook=reporthook)
         return next_id
 
     def generate_images(self, dir_id: str, dpi=200):
-        pdf_path = self.output_dir_path / dir_id / self.output_pdf_name
-        return convert_from_path(pdf_path, dpi)
+        return convert_from_path(self.get_pdf_path(dir_id), dpi)
 
     def save_images_to_files(self, dir_id: str, pages) -> None:
-        dir_path = self.output_dir_path / dir_id
         for i, page in enumerate(pages):
-            current_out_name = self.output_image_name % i
-            page.save(dir_path / current_out_name, 'JPEG')
+            page.save(self.get_page_path(dir_id, i), 'JPEG')
 
     def get_number_of_pages(self, dir_id: int) -> Optional[int]:
         if dir_id not in self.pdf_len_cache:
@@ -88,6 +82,11 @@ class _Helper:
 
     def get_page_path(self, dir_id: str, page_num: int):
         return self.output_dir_path / dir_id / (self.output_image_name % page_num)
+
+    def get_pdf_path(self, dir_id: str, make_dir=False):
+        if make_dir:
+            (self.output_dir_path / dir_id).mkdir()
+        return self.output_dir_path / dir_id / self.output_pdf_name
 
 
 def telegram(update: Update, context: CallbackContext) -> None:
@@ -131,7 +130,7 @@ def telegram(update: Update, context: CallbackContext) -> None:
         update.effective_message.reply_text('Error occurred. Check logs.')
 
 
-def get_pdf_page(self: MyHTTPHandler):
+def get_pdf_html_page(self: MyHTTPHandler):
     try:
         pdf_id = int(self.path.split('/')[3])
         pdf_id = str(pdf_id)
@@ -213,4 +212,24 @@ def get_pdf_image(self: MyHTTPHandler):
     self.send_header('Content-type', 'image/jpg')
     self.end_headers()
     with open(page_path, 'rb') as f:
+        self.wfile.write(f.read())
+
+def get_raw_pdf(self: MyHTTPHandler):
+    try:
+        pdf_id = int(self.path.split('/')[3])
+        pdf_id = str(pdf_id)
+    except Exception:
+        self.send_response(403)
+        self.end_headers()
+        return
+    helper: _Helper = self.pocket.get(__name__)
+    pdf_path = helper.get_pdf_path(pdf_id)
+    if pdf_path is None:
+        self.send_response(403)
+        self.end_headers()
+        return
+    self.send_response(200)
+    self.send_header('Content-type', 'application/pdf')
+    self.end_headers()
+    with open(pdf_path, 'rb') as f:
         self.wfile.write(f.read())
