@@ -20,29 +20,7 @@ def init(pocket: Pocket):
         'asset_files': os.listdir(asset_dir)
     })
     pocket.store.dispatch(AddServerHandler('get', '/testapp/', handle_asset))
-    pocket.store.dispatch(AddServerHandler('post', '/testapp/', handle_POST))
-
-
-def handle_asset(self: MyHTTPHandler):
-    """ Handle assets requested through GET method """
-    path = self.path.split('/')[2:]
-    if len(path) > 1:
-        self.send_response(403)
-        self.end_headers()
-
-    asset_name = path[0]
-    if asset_name == '':
-        asset_name = 'index.html'
-    dict_ = self.pocket.get(__name__)
-    if asset_name not in dict_.get('asset_files'):
-        self.send_response(403)
-        self.end_headers()
-        return
-    self.send_response(200)
-    self.send_header('Content-type', 'text/html')
-    self.end_headers()
-    with open(dict_.get('asset_dir') / asset_name, 'rb') as f:
-        self.wfile.write(f.read())
+    pocket.store.dispatch(AddServerHandler('post', '/testapp/', handle_post))
 
 
 class InternalServerError(Exception):
@@ -52,7 +30,38 @@ class InternalServerError(Exception):
         super().__init__(self.message)
 
 
-def handle_POST(self: MyHTTPHandler):
+def handle_asset(self: MyHTTPHandler):
+    """ Handle assets requested through GET method """
+    try:
+        asset_name, *rest_of_path = self.path.split('/')[2:]
+        if len(rest_of_path) > 0:
+            raise InternalServerError(message='Invalid asset request')
+        if asset_name == '':
+            asset_name = 'index.html'
+        dict_ = self.pocket.get(__name__)
+        if asset_name not in dict_.get('asset_files'):
+            raise InternalServerError(message='Unable to find requested asset')
+        with open(dict_.get('asset_dir') / asset_name, 'rb') as f:
+            resp = f.read()
+    except InternalServerError as e:
+        self.send_response(e.status)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'status': e.status, 'error': e.message}).encode('utf-8'))
+        return
+    except Exception as e:
+        self.send_response(500)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'status': 500, 'error': 'Exception occured. Check logs'}).encode('utf-8'))
+        return
+    self.send_response(200)
+    self.send_header('Content-type', 'text/html')
+    self.end_headers()
+    self.wfile.write(resp)
+
+
+def handle_post(self: MyHTTPHandler):
     """ handle api calls through the POST method """
     try:
         post_data = parse_post_data(self)
@@ -66,7 +75,6 @@ def handle_POST(self: MyHTTPHandler):
         self.wfile.write(json.dumps({'status': e.status, 'error': e.message}).encode('utf-8'))
         return
     except Exception as e:
-
         self.send_response(500)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
