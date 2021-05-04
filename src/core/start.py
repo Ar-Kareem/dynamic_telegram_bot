@@ -27,6 +27,9 @@ def init_logger():
     stderr_handler.setLevel(logging.DEBUG)
     handlers = [stderr_handler, debug_file_handler, warn_file_handler]
 
+    my_root = logging.getLogger('src')
+    my_root.setLevel(logging.DEBUG)
+
     logging.basicConfig(
         level=logging.INFO,
         format='[%(asctime)s] {%(filename)s:%(lineno)d - %(name)s} %(levelname)s - %(message)s',
