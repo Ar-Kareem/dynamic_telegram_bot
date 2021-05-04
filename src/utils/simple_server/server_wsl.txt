@@ -1,0 +1,17 @@
+If server doesn't work when running in WSL then try to connect to it using localhost:PORT
+4 different access levels:
+    1- localhost
+    2- wsl ip
+    3- computer ip
+    4- external ip
+2-4 seem to not work.
+------ TO FIX:
+in powershell:
+Step 1: find ip of wsl
+    RUN: wsl hostname -I
+Step 2: route port to IP from previous step
+    RUN: netsh interface portproxy add v4tov4 listenport=3242 listenaddress=0.0.0.0 connectport=3242 connectaddress=192.168.112.243
+this could also potentially brake the port you run it on (localhost will no longer work)
+running the same command again will overwrite
+
+To show NETSH active routings:  netsh interface portproxy show v4tov4
