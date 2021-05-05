@@ -4,6 +4,7 @@ from typing import Optional, Callable
 from urllib import request
 from pathlib import Path
 import os
+import json
 
 from telegram import Update, MessageEntity
 from telegram.ext import CommandHandler, CallbackContext
@@ -15,7 +16,7 @@ try:
     import pdf2image
     from pdf2image import convert_from_path
 except ImportError as e:
-    pass
+    convert_from_path = None
 
 from src.core.actions import TelegramBotInitiated, AddServerHandler
 from src.core.start import Pocket
@@ -25,11 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 def init(pocket: Pocket):
-    try:
-        import pdf2image
-    except ImportError:
-        logger.info('Cannot import pdf2image. Skipping %s. Try: pip install pdf2image', __name__)
-        return
+    if convert_from_path is None:
+        logger.info('Cannot import pdf2image. Try: pip install pdf2image')
 
     helper = _Helper(output_dir_name='output')
     pocket.set(__name__, helper)
@@ -37,11 +35,13 @@ def init(pocket: Pocket):
     pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', get_pdf_html_page))
     pocket.store.dispatch(AddServerHandler('get', '/pdf/image/', get_pdf_image))
     pocket.store.dispatch(AddServerHandler('get', '/pdf/raw/', get_raw_pdf))
+    pocket.store.dispatch(AddServerHandler('get', '/pdf/counts/', get_database_status))
 
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
     dispatcher = pocket.telegram_updater.dispatcher
-    dispatcher.add_handler(CommandHandler("pdf", telegram))
+    dispatcher.add_handler(CommandHandler("pdf", pdf_request))
+    dispatcher.add_handler(CommandHandler("pdfsync", sync_database_telegram))
 
 
 class _Helper:
@@ -69,6 +69,8 @@ class _Helper:
         return next_id
 
     def generate_images(self, dir_id: str, dpi=200):
+        if convert_from_path is None:
+            return None
         return convert_from_path(self.get_pdf_path(dir_id), dpi)
 
     def save_images_to_files(self, dir_id: str, pages) -> None:
@@ -89,7 +91,7 @@ class _Helper:
         return self.output_dir_path / dir_id / self.output_pdf_name
 
 
-def telegram(update: Update, context: CallbackContext) -> None:
+def pdf_request(update: Update, context: CallbackContext) -> None:
     # https://arxiv.org/pdf/1905.11397.pdf
     pocket: Pocket = context.bot_data['pocket']
     helper: _Helper = pocket.get(__name__)
@@ -214,6 +216,7 @@ def get_pdf_image(self: MyHTTPHandler):
     with open(page_path, 'rb') as f:
         self.wfile.write(f.read())
 
+
 def get_raw_pdf(self: MyHTTPHandler):
     try:
         pdf_id = int(self.path.split('/')[3])
@@ -233,3 +236,95 @@ def get_raw_pdf(self: MyHTTPHandler):
     self.end_headers()
     with open(pdf_path, 'rb') as f:
         self.wfile.write(f.read())
+
+
+def get_database_status(self: MyHTTPHandler):
+    path = [subpath for subpath in self.path.split('/')[3:] if subpath != '']
+    helper: _Helper = self.pocket.get(__name__)
+    if len(path) == 0:
+        resp = os.listdir(helper.output_dir_path)
+    elif len(path) == 1:
+        pdf_id = str(int(path[0]))
+        pages = helper.get_number_of_pages(pdf_id)
+        size = os.path.getsize(helper.get_pdf_path(pdf_id))
+        resp = {'pages': pages, 'size': size}
+    else:
+        self.send_response(404)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        return
+    self.send_response(200)
+    self.send_header('Content-type', 'application/json')
+    self.end_headers()
+    self.wfile.write(json.dumps(resp).encode('utf-8'))
+
+
+def sync_database_telegram(update: Update, context: CallbackContext) -> None:
+    # https://arxiv.org/pdf/1905.11397.pdf
+    pocket: Pocket = context.bot_data['pocket']
+    helper: _Helper = pocket.get(__name__)
+    for entity in update.effective_message.entities:
+        if entity.type == MessageEntity.URL:
+            a, b = entity.offset, entity.offset+entity.length
+            url = update.effective_message.text[a:b]
+            url = url if url.startswith('http') else 'http://' + url
+            break
+    else:
+        update.effective_message.reply_text('no url found')
+        return
+    try:
+        unimportant_msg = None
+        def report_hook(msg: str, important: bool = False):
+            nonlocal unimportant_msg
+            if unimportant_msg is None:
+                unimportant_msg = update.effective_message.reply_text(msg)
+            else:
+                unimportant_msg.edit_text(msg)
+            unimportant_msg = unimportant_msg if not important else None
+
+        sync_database(url, report_hook)
+    except Exception:
+        logger.exception('Error while syncing database.')
+        update.effective_message.reply_text('Error occurred. Check logs.')
+
+
+def sync_database(url, report_hook):
+    target_dir = Path(__file__).parent / 'output'
+    url_counts = url + '/pdf/counts'
+    url_raw = url + '/pdf/raw'
+    url_image = url + '/pdf/image'
+    output_pdf_name = 'output.pdf'
+
+    def url_get(url: str):
+        with request.urlopen(url) as r:
+            return json.loads(r.read())
+
+    target_dir.mkdir(exist_ok=True)
+    target_dir_files = os.listdir(target_dir)
+    report_hook(f'Getting source PDF count from {url_counts}...', False)
+    pdfs = url_get(url_counts)
+    report_hook(f'Total pdf {len(pdfs)}', True)
+    for pdf_id in pdfs:
+        cur_stats = url_get(url_counts + '/' + pdf_id)
+        cur_dir = target_dir / pdf_id
+        if not Path(cur_dir).exists() or len(os.listdir(cur_dir)) == 0:  # folder doesn't exists or empty
+            Path(cur_dir).mkdir(exist_ok=True)
+            # start syncing (download pdf and images)
+            report_hook(f'{pdf_id} Downloading PDF...', False)
+            request.urlretrieve(url_raw + '/' + pdf_id, cur_dir / output_pdf_name)
+            for i in range(cur_stats['pages']):
+                report_hook(f'{pdf_id} Downloading page {i}...', False)
+                request.urlretrieve(url_image + '/' + pdf_id + '/' + str(i), cur_dir / (str(i) + '.jpg'))
+        else:  # folder already exists and has content
+            # need to check that folder content matches server otherwise desync
+            cur_dir_files = os.listdir(cur_dir)
+            jpg_count = len([f for f in cur_dir_files if f.endswith('.jpg')])
+            if output_pdf_name not in cur_dir_files:
+                report_hook(f'{pdf_id} DESYNC pdf doesnt exist', True)
+            elif os.path.getsize(cur_dir / output_pdf_name) != cur_stats['size']:
+                report_hook(f'{pdf_id} DESYNC in pdf size', True)
+            elif len(cur_dir_files) - 1 != cur_stats['pages']:
+                report_hook(f'{pdf_id} DESYNC in pages', True)
+            else:
+                report_hook(f'{pdf_id} Good.', False)
+    report_hook(f'Done.', True)
