@@ -50,7 +50,8 @@ def get_index(self: MyHTTPHandler):
     self.end_headers()
     self.wfile.write(bytes("<html><head><title>Response</title></head>", "utf-8"))
     self.wfile.write(bytes("<body>", "utf-8"))
-    for prefix, _ in self.pocket.inner_pocket.get('http_handler_dict', {}).get('GET', {}):
+    from ..init.http_init import DICT_NAME
+    for prefix, _ in self.pocket.inner_pocket.get(DICT_NAME, {}).get('GET', {}):
         self.wfile.write(bytes('<div><a href="%s">%s</a></div>' % (prefix, prefix), "utf-8"))
     self.wfile.write(bytes("</body></html>", "utf-8"))
 
