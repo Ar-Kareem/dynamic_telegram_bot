@@ -10,7 +10,7 @@ from telegram import Update, MessageEntity
 from telegram.ext import CallbackContext
 
 from src.core.start import Pocket
-from init import PDFHelper
+from src.handlers.serve_pdf.helper import PDFHelper
 
 try:
     import pdf2image

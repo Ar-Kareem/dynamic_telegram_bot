@@ -2,7 +2,7 @@ import logging
 import os
 import json
 
-from init import PDFHelper
+from src.handlers.serve_pdf.helper import PDFHelper
 
 from src.utils.simple_server.simple_server import MyHTTPHandler
 
