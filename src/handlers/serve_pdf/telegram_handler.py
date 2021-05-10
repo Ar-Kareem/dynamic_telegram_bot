@@ -10,7 +10,7 @@ from telegram import Update, MessageEntity
 from telegram.ext import CallbackContext
 
 from src.core.start import Pocket
-from src.handlers.serve_pdf.helper import PDFHelper
+from src.handlers.serve_pdf.helper import PDFHelper, DICT_NAME
 
 try:
     import pdf2image
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def pdf_request(update: Update, context: CallbackContext) -> None:
     # https://arxiv.org/pdf/1905.11397.pdf
     pocket: Pocket = context.bot_data['pocket']
-    helper: PDFHelper = pocket.get(__name__)
+    helper: PDFHelper = pocket.get(DICT_NAME)
     for entity in update.effective_message.entities:
         if entity.type == MessageEntity.URL:
             a, b = entity.offset, entity.offset+entity.length

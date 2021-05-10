@@ -2,7 +2,7 @@ import logging
 import os
 import json
 
-from src.handlers.serve_pdf.helper import PDFHelper
+from src.handlers.serve_pdf.helper import PDFHelper, DICT_NAME
 
 from src.utils.simple_server.simple_server import MyHTTPHandler
 
@@ -20,7 +20,7 @@ def get_pdf_html_page(self: MyHTTPHandler):
         self.send_response(403)
         self.end_headers()
         return
-    helper: PDFHelper = self.pocket.get(__name__)
+    helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
         self.send_response(403)
@@ -82,7 +82,7 @@ def get_pdf_image(self: MyHTTPHandler):
         self.send_response(403)
         self.end_headers()
         return
-    helper: PDFHelper = self.pocket.get(__name__)
+    helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
         self.send_response(403)
@@ -103,7 +103,7 @@ def get_raw_pdf(self: MyHTTPHandler):
         self.send_response(403)
         self.end_headers()
         return
-    helper: PDFHelper = self.pocket.get(__name__)
+    helper: PDFHelper = self.pocket.get(DICT_NAME)
     pdf_path = helper.get_pdf_path(pdf_id)
     if pdf_path is None:
         self.send_response(403)
@@ -118,7 +118,7 @@ def get_raw_pdf(self: MyHTTPHandler):
 
 def get_database_status(self: MyHTTPHandler):
     path = [subpath for subpath in self.path.split('/')[3:] if subpath != '']
-    helper: PDFHelper = self.pocket.get(__name__)
+    helper: PDFHelper = self.pocket.get(DICT_NAME)
     if len(path) == 0:
         resp = os.listdir(helper.output_dir_path)
     elif len(path) == 1:

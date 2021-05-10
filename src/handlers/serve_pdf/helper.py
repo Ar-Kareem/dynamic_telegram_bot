@@ -15,6 +15,7 @@ except ImportError as e:
 
 
 logger = logging.getLogger(__name__)
+DICT_NAME = 'serve_pdf'
 
 
 class PDFHelper:

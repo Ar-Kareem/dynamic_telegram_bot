@@ -8,7 +8,7 @@ from src.core.actions import TelegramBotInitiated, AddServerHandler
 from src.core.start import Pocket
 import src.handlers.serve_pdf.telegram_handler as telegram_handler
 import src.handlers.serve_pdf.http_handler as http_handler
-from src.handlers.serve_pdf.helper import PDFHelper
+from src.handlers.serve_pdf.helper import PDFHelper, DICT_NAME
 
 try:
     import pdf2image
@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 
 def init(pocket: Pocket):
     if pdf2image_error:
-        logger.info('Cannot import pdf2image. Try: pip install pdf2image')
+        logger.info('Cannot import pdf2image. Try: pip install pdf2image.')
+        logger.info('On linux some linux distros (PI), you might have to apt-get libopenjp2-7 libtiff5')
 
     helper = PDFHelper(output_dir_name='output')
-    pocket.set(__name__, helper)
+    pocket.set(DICT_NAME, helper)
     pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
     pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', http_handler.get_pdf_html_page))
     pocket.store.dispatch(AddServerHandler('get', '/pdf/image/', http_handler.get_pdf_image))
