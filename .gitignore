@@ -1,8 +1,11 @@
 /.idea
 *.pyc
+
 settings.ini
 settings_WSL.ini
+settings_PI.ini
 
+/database/
 /jupyter/
 /logs/
 /src/utils/simple_server/ssl
