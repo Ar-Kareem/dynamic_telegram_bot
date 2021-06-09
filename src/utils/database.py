@@ -83,3 +83,7 @@ def _expand_collected_dir(data: dict, cur_path: Path, hard_overwrite: bool):
 def _print_random_key(length=32):
     k = secrets.token_bytes(length)
     print("".join('\\x%02x' % b for b in k))
+
+
+def string_to_key(_key):
+    return b''.join([int(_key[i+2:i+4], 16).to_bytes(1, 'little') for i in range(0, len(_key), 4)])
