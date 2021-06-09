@@ -44,6 +44,7 @@ def log(update: Update, context: CallbackContext, file_path: Path) -> None:
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
     file_path = pocket.database_dir / 'misc' / 'tracker.txt'
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     dispatcher = pocket.telegram_updater.dispatcher
 
     def log_partial(*args):

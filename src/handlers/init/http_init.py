@@ -29,6 +29,9 @@ def init(pocket: Pocket):
     timeout = pocket.config.getfloat('SERVER', 'timeout', fallback=None)
     if use_ssl:
         pem_files = pocket.database_dir / 'ssl' / 'pem_files'
+        if not pem_files.exists():
+            logger.warning('Cant deploy server with ssl, certificates not found in database')
+            return
         website_dir = pem_files / os.listdir(pem_files)[0]
         pem_files = os.listdir(website_dir)
         fullchain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]

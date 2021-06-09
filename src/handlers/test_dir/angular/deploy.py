@@ -15,6 +15,9 @@ MAX_POST_BYTES = 2**14
 
 def init(pocket: Pocket):
     asset_dir = pocket.database_dir / 'frontend_testapp'
+    if not asset_dir.exists():
+        logger.warning('Cant deploy testapp, does not exist on database')
+        return
     pocket.set(__name__, {
         'asset_dir': asset_dir,
         'asset_files': os.listdir(asset_dir)
