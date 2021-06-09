@@ -2,8 +2,6 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.cookies import SimpleCookie
-import os
-from pathlib import Path
 import threading
 import socket
 import logging
@@ -59,7 +57,8 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
 
 
 def start_server(handler: MyHTTPHandler, hostname: str = None,
-                 localhost: bool = False, port: int = 8049, ssl: bool = False, timeout: int = None) -> HTTPServer:
+                 localhost: bool = False, port: int = 8049,
+                 ssl_cert_key_paths: list = None, timeout: int = None) -> HTTPServer:
     if hostname is None:
         if localhost:
             hostname = 'localhost'
@@ -72,9 +71,10 @@ def start_server(handler: MyHTTPHandler, hostname: str = None,
 
     webserver = HTTPServer((hostname, port), handler)
 
-    if ssl:
+    if ssl_cert_key_paths is not None:
         import ssl
-        webserver.socket = ssl.wrap_socket(webserver.socket, certfile=_get_cert_path(), keyfile=__get_key_path(),
+        webserver.socket = ssl.wrap_socket(webserver.socket,
+                                           certfile=ssl_cert_key_paths[0], keyfile=ssl_cert_key_paths[1],
                                            server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
@@ -85,22 +85,6 @@ def start_server(handler: MyHTTPHandler, hostname: str = None,
 def close_server(server: HTTPServer) -> None:
     server.shutdown()
     server.server_close()
-
-
-def _get_cert_path():
-    pem_files = Path(__file__).parent / 'ssl' / 'pem_files'
-    website_dir = pem_files / os.listdir(pem_files)[0]
-    pem_files = os.listdir(website_dir)
-    fullchain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]
-    return website_dir / fullchain
-
-
-def __get_key_path():
-    pem_files = Path(__file__).parent / 'ssl' / 'pem_files'
-    website_dir = pem_files / os.listdir(pem_files)[0]
-    pem_files = os.listdir(website_dir)
-    privkey = sorted([f for f in pem_files if f.startswith('privkey')])[-1]
-    return website_dir / privkey
 
 
 # need to warn user if timeout is set multiple times since socket default timeout only supports single value overall

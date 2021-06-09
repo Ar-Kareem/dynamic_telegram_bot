@@ -1,5 +1,7 @@
 import logging
 from functools import partial
+import os
+from pathlib import Path
 
 from src.core.actions import Terminate, AddServerHandler
 from src.core.start import Pocket
@@ -23,9 +25,19 @@ def init(pocket: Pocket):
     localhost = pocket.config.getboolean('SERVER', 'localhost', fallback=False)
     server_port = pocket.config.getint('SERVER', 'port', fallback=8049)
     use_ssl = pocket.config.getboolean('SERVER', 'SSL', fallback=False)
+    ssl_cert_key_paths = None
     timeout = pocket.config.getfloat('SERVER', 'timeout', fallback=None)
+    if use_ssl:
+        pem_files = pocket.database_dir / 'ssl' / 'pem_files'
+        website_dir = pem_files / os.listdir(pem_files)[0]
+        pem_files = os.listdir(website_dir)
+        fullchain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]
+        privkey = sorted([f for f in pem_files if f.startswith('privkey')])[-1]
+        ssl_cert_key_paths = [website_dir / fullchain, website_dir / privkey]
+
     try:
-        http_server = start_server(handler, localhost=localhost, port=server_port, ssl=use_ssl, timeout=timeout)
+        http_server = start_server(handler, localhost=localhost, port=server_port,
+                                   ssl_cert_key_paths=ssl_cert_key_paths, timeout=timeout)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
         return
