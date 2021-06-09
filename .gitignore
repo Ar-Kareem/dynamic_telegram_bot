@@ -8,6 +8,3 @@ settings_PI.ini
 /database/
 /jupyter/
 /logs/
-/src/utils/simple_server/ssl
-/src/handlers/serve_pdf/output/
-/src/handlers/telegram_only/tracker.txt
