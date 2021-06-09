@@ -9,6 +9,7 @@ class Pocket:
         self.store = Store()
         self.reducer = Reducer(store=self.store)
         self.config = utils.init_config(config_path=config_path)
+        self.database_dir = utils.get_db_path()
 
         self.inner_pocket: Dict[str, any] = {}
         self.telegram_updater = None

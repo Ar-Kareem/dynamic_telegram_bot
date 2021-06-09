@@ -21,6 +21,13 @@ def get_handlers_import_path_relative() -> str:
     return 'src.handlers'
 
 
+def get_db_path() -> Path:
+    """Returns a path to the project database directory, and init the directory not exists"""
+    result = get_project_root() / 'database' / 'active'
+    result.mkdir(exist_ok=True, parents=True)
+    return result
+
+
 def init_config(config_path=None) -> ConfigParser:
     try:
         config = ConfigParser()
