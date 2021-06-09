@@ -12,10 +12,10 @@ from src.utils.affiliates import BaseAction
 logger = logging.getLogger(__name__)
 
 
-def register_user(username, cache=[None]):
+def register_user(username, file_path, cache=[None]):
     usernames = cache[0]
     if usernames is None:
-        with open(Path(__file__).parent / 'tracker.txt', 'a+') as f:
+        with open(file_path, 'a+') as f:
             f.seek(0)
             usernames = [line[:-1] for line in f.readlines()]
             cache[0] = usernames
@@ -26,15 +26,15 @@ def register_user(username, cache=[None]):
     # else use cached version
     if username not in usernames:
         cache[0] = None
-        return register_user(username)  # invalidate cache and retry
+        return register_user(username, file_path)  # invalidate cache and retry
     return False
 
 
 # Telegram Handlers
-def log(update: Update, context: CallbackContext) -> None:
+def log(update: Update, context: CallbackContext, file_path: Path) -> None:
     username = update.effective_user.username
     try:
-        new_user = register_user(username)
+        new_user = register_user(username, file_path)
         if new_user:
             update.message.reply_text('NEW USER REGISTERED.')
     except Exception:
@@ -43,8 +43,12 @@ def log(update: Update, context: CallbackContext) -> None:
 
 
 def init_bot_handlers(action: BaseAction, pocket: Pocket):
+    file_path = pocket.database_dir / 'telegram_username_tracker' / 'tracker.txt'
     dispatcher = pocket.telegram_updater.dispatcher
-    dispatcher.add_handler(MessageHandler(Filters.all, log), group=22)
+
+    def log_partial(*args):
+        return log(*args, file_path=file_path)
+    dispatcher.add_handler(MessageHandler(Filters.all, log_partial), group=22)
 
 
 def init(pocket: Pocket):
