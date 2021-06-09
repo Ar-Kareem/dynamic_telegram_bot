@@ -82,14 +82,15 @@ def sync_database_telegram(update: Update, context: CallbackContext) -> None:
                 prev_msg.edit_text(msg)
             prev_msg = prev_msg if not important else None
 
-        _sync_database(url, report_hook)
+        pocket: Pocket = context.bot_data['pocket']
+        target_dir = pocket.database_dir / 'serve_pdf_output'
+        _sync_database(url, target_dir, report_hook)
     except Exception:
         logger.exception('Error while syncing database.')
         update.effective_message.reply_text('Error occurred. Check logs.')
 
 
-def _sync_database(url, report_hook):
-    target_dir = Path(__file__).parent / 'output'
+def _sync_database(url, target_dir, report_hook):
     url_counts = url + '/pdf/counts'
     url_raw = url + '/pdf/raw'
     url_image = url + '/pdf/image'

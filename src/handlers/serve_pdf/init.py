@@ -25,7 +25,7 @@ def init(pocket: Pocket):
         logger.info('Cannot import pdf2image. Try: pip install pdf2image.')
         logger.info('On linux some linux distros (PI), you might have to apt-get libopenjp2-7 libtiff5')
 
-    helper = PDFHelper(output_dir_name='output')
+    helper = PDFHelper(output_dir=(pocket.database_dir / 'serve_pdf_output'))
     pocket.set(DICT_NAME, helper)
     pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
     pocket.store.dispatch(AddServerHandler('get', '/pdf/page/', http_handler.get_pdf_html_page))

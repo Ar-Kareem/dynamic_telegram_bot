@@ -19,8 +19,8 @@ DICT_NAME = 'serve_pdf'
 
 
 class PDFHelper:
-    def __init__(self, output_dir_name):
-        self.output_dir_path = Path(__file__).parent / output_dir_name
+    def __init__(self, output_dir):
+        self.output_dir_path = output_dir
         self.output_pdf_name = 'output.pdf'
         self.output_image_name = '%d.jpg'
         self.pdf_len_cache = {}  # cache lengths instead of scanning os each time
