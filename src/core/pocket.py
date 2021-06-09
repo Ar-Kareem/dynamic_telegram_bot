@@ -1,5 +1,4 @@
-import time
-from threading import Thread
+from typing import Dict
 
 from src.utils import utils
 from src.utils.affiliates import Store, Reducer
@@ -11,10 +10,7 @@ class Pocket:
         self.reducer = Reducer(store=self.store)
         self.config = utils.init_config(config_path=config_path)
 
-        self.active_threads: list[Thread] = []
-        self.inner_pocket: dict[str, any] = {}
-
-        self.start_time = time.localtime()
+        self.inner_pocket: Dict[str, any] = {}
         self.telegram_updater = None
 
     def get(self, name: str) -> any:
