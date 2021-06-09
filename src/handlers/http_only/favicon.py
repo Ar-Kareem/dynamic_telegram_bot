@@ -13,5 +13,5 @@ def serve_favicon(self: MyHTTPHandler):
     self.send_response(200)
     self.send_header('Content-type', 'image/png')
     self.end_headers()
-    with open(Path(__file__).parent / 'favicon.ico', 'rb') as f:
+    with open(self.pocket.database_dir / 'misc' / 'favicon.ico', 'rb') as f:
         self.wfile.write(f.read())
