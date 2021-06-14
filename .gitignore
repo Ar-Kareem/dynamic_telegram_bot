@@ -8,6 +8,7 @@ settings_PI.ini
 # ignored database directory except the encrypted subfolder
 /database/*
 !/database/encrypted/
+!/database/encrypted/*
 
 /jupyter/
 /logs/
