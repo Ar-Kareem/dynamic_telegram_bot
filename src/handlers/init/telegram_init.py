@@ -41,6 +41,13 @@ def echo(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(update.message.text)
 
 
+def ping(update: Update, context: CallbackContext) -> None:
+    if update.message.text.lower() == '/ping':
+        update.message.reply_text('/pong')
+    else:
+        update.message.reply_text('/ping')
+
+
 # Action Handlers
 def handle_send_message(action: BaseAction, pocket: Pocket):
     updater: Updater = pocket.telegram_updater
@@ -69,7 +76,8 @@ def init_bot_handlers(action: BaseAction, pocket: Pocket):
     dispatcher.add_handler(CommandHandler("reset", reset))
     dispatcher.add_handler(CommandHandler("stop", stop))
     dispatcher.add_handler(CommandHandler("nuke", nuke))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+    dispatcher.add_handler(CommandHandler(["ping","pong"], ping))
+    # dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
 
 def init(pocket: Pocket):
