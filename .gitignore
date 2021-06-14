@@ -5,6 +5,9 @@ settings.ini
 settings_WSL.ini
 settings_PI.ini
 
-/database/
+# ignored database directory except the encrypted subfolder
+/database/*
+!/database/encrypted/
+
 /jupyter/
 /logs/
