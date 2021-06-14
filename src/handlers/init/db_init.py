@@ -17,6 +17,9 @@ def init(pocket: Pocket):
 
     db_root = pocket.database_dir.parent
     encrypted = Path(db_root / 'encrypted')
+    if not encrypted.exists():
+        logger.info('cannot find encrypted db folder.')
+        return
 
     db_files = [encrypted / db_file for db_file in os.listdir(encrypted)]
     for db_file in db_files:
