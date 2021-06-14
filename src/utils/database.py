@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from shutil import rmtree
 from configparser import ConfigParser
+from datetime import datetime
 import pickle
 import secrets
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # suggested by stackoverflow.com/questions/36117046/
@@ -10,15 +11,18 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # suggested by s
 _METADATA_FILENAME = '.metadata.ini'
 
 
-def compress(dir_path, output_file, encrypt_key, metadata_key=None):
-    result = {'name': dir_path.name, 'folders': []}
+def compress(dir_path, output_file, encrypt_key, check_callback=None):
+    result = {
+        'name': dir_path.name,
+        'folders': [],
+        'date': datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
+    }
     dirs = [dir_path / n for n in os.listdir(dir_path) if (dir_path / n).is_dir()]
     for d in dirs:
-        if metadata_key is not None:
+        if check_callback is not None:
             config = ConfigParser()
             config.read(d / _METADATA_FILENAME)
-            key = config.getboolean('METADATA', metadata_key, fallback=False)
-            if not key:  # does not pass the check
+            if not check_callback(d, config):  # callback returned false, do not compress
                 continue
         result['folders'].append(_collect_dir(d))
 
@@ -46,7 +50,7 @@ def _collect_dir(dir_path: Path):
     return result
 
 
-def decompress(db_file, output_dir, decrypt_key, hard_overwrite=False):
+def decompress(db_file, output_dir, decrypt_key, rm_callback=None):
     with open(db_file, 'rb') as f:
         db_bytes = f.read()
     # decrypt
@@ -55,26 +59,39 @@ def decompress(db_file, output_dir, decrypt_key, hard_overwrite=False):
 
     # create the output directory
     db_dir = (output_dir / db_dict['name'])
-    db_dir.mkdir(exist_ok=True)
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    compression_date_str = db_dict['date']
+    compression_date = datetime.strptime(compression_date_str, '%Y-%m-%d-%H:%M:%S')
+
     for folder_data in db_dict['folders']:
-        _expand_collected_dir(folder_data, cur_path=db_dir, hard_overwrite=hard_overwrite)
+        cur_folder = db_dir / folder_data['name']
+        config = ConfigParser()
+        config.read(cur_folder / _METADATA_FILENAME)
+        if cur_folder.exists():
+            # folder already exists, ask the callback function what to do, giving it folder path and compression date
+            if rm_callback is not None and rm_callback(cur_folder, config, compression_date):
+                rmtree(cur_folder)
+            else:
+                continue
+        _expand_collected_dir(folder_data, cur_path=db_dir)
+        # add the decompression date to the metadata
+        if not config.has_section('METADATA'):
+            config.add_section('METADATA')
+        config.set('METADATA', 'restored_from', compression_date_str)
+        with open(cur_folder / _METADATA_FILENAME, 'w') as configfile:
+            config.write(configfile)
 
 
-def _expand_collected_dir(data: dict, cur_path: Path, hard_overwrite: bool):
+def _expand_collected_dir(data: dict, cur_path: Path):
     cur_folder = cur_path / data['name']
-    if cur_folder.exists():  # folder already exists, either overwrite it or exit
-        if hard_overwrite:
-            rmtree(cur_folder)
-        else:
-            print('cannot expand already existing folder unless hard_overwrite is on')
-            return
     cur_folder.mkdir()
     for sub_folder in data['folders']:
-        _expand_collected_dir(sub_folder, cur_path=cur_folder, hard_overwrite=hard_overwrite)
+        _expand_collected_dir(sub_folder, cur_path=cur_folder)
     for file_data in data['files']:
         file_path = cur_folder / file_data['name']
         if file_path.exists():
-            # print('file already exists...', file_path)
+            print('file already exists...', file_path)
             continue
         with open(file_path, 'wb') as f:
             f.write(file_data['data'])
@@ -87,3 +104,14 @@ def _print_random_key(length=32):
 
 def string_to_key(_key):
     return b''.join([int(_key[i+2:i+4], 16).to_bytes(1, 'little') for i in range(0, len(_key), 4)])
+
+
+def date_delete_callback(fldr_path: Path, fldr_config: ConfigParser, db_date: datetime):
+    """Helper function implementing a delete callback that compares dates"""
+    parsed = fldr_config.get('METADATA', 'restored_from', fallback=None)
+    if parsed is None:
+        print('cannot determine if db copy is newer or older since .ini file does not contain date')
+        return False
+    fldr_date = datetime.strptime(parsed, '%Y-%m-%d-%H:%M:%S')
+    # print(db_date > fldr_date, fldr_path.name, fldr_date, db_date)
+    return db_date > fldr_date
