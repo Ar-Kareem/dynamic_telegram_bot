@@ -1,10 +1,9 @@
-import subprocess
 import os
 import logging
 from functools import partial
 
 from telegram import Update
-from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext, Updater
+from telegram.ext import CommandHandler, CallbackContext, Updater
 
 from src.core.actions import InitScriptsFinished, SendTelegramMessage, TelegramMessageToMe, TelegramBotInitiated, \
     Terminate
@@ -76,7 +75,7 @@ def init_bot_handlers(action: BaseAction, pocket: Pocket):
     dispatcher.add_handler(CommandHandler("reset", reset))
     dispatcher.add_handler(CommandHandler("stop", stop))
     dispatcher.add_handler(CommandHandler("nuke", nuke))
-    dispatcher.add_handler(CommandHandler(["ping","pong"], ping))
+    dispatcher.add_handler(CommandHandler(["ping", "pong"], ping))
     # dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
 

@@ -1,7 +1,6 @@
 import logging
 from functools import partial
 import os
-from pathlib import Path
 
 from src.core.actions import Terminate, AddServerHandler
 from src.core.start import Pocket
@@ -35,9 +34,9 @@ def init(pocket: Pocket):
             return
         website_dir = pem_files / os.listdir(pem_files)[0]
         pem_files = os.listdir(website_dir)
-        fullchain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]
-        privkey = sorted([f for f in pem_files if f.startswith('privkey')])[-1]
-        ssl_cert_key_paths = [website_dir / fullchain, website_dir / privkey]
+        full_chain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]
+        private_key = sorted([f for f in pem_files if f.startswith('privkey')])[-1]
+        ssl_cert_key_paths = [website_dir / full_chain, website_dir / private_key]
 
     try:
         http_server = start_server(handler, localhost=localhost, port=server_port,
@@ -87,7 +86,8 @@ def handle_http_request(self: MyHTTPHandler, method: str):
             return
 
     send404(self)
-    logger.info("No HTTP handler for %s: %s [from %s:%s]", method, path, self.client_address[0], self.client_address[1])
+    logger.warning("No HTTP handler for %s: %s [from %s:%s]",
+                   method, path, self.client_address[0], self.client_address[1])
 
 
 def send404(self: MyHTTPHandler):
@@ -109,7 +109,7 @@ def log_message(self: MyHTTPHandler, format_: str, *args: any) -> None:
         elif len(args) >= 2 and isinstance(args[1], str) and args[1].startswith('Unsupported method ('):
             # server logs twice if unsupported method, once handled above and the other is ignored here
             return
-    except Exception as e:
+    except Exception:
         # log the default issue below
         pass
     self.logger.warning(format_, *args)
