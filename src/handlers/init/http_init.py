@@ -19,8 +19,9 @@ def init(pocket: Pocket):
     # create HTTP Handler and bind functionality to it
     handler = MyHTTPHandler(logger=logger)
     handler.pocket = pocket
-    for func in (do_POST, do_GET):
-        handler.bind(func)
+    handler.bind(log_message, as_name='log_message')
+    handler.bind(lambda self: handle_http_request(self, 'POST'), as_name='do_POST')
+    handler.bind(lambda self: handle_http_request(self, 'GET'), as_name='do_GET')
 
     localhost = pocket.config.getboolean('SERVER', 'localhost', fallback=False)
     server_port = pocket.config.getint('SERVER', 'port', fallback=8049)
@@ -68,13 +69,11 @@ def add_server_handler(action: AddServerHandler, pocket: Pocket):
 
 # Methods to be bound to MyHTTPHandler
 
-def call_appropriate_handler(self: MyHTTPHandler, method: str):
+def handle_http_request(self: MyHTTPHandler, method: str):
     module_dict: dict = self.pocket.get(DICT_NAME)
     handlers = module_dict.get(method)
     if handlers is None:
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
+        send404(self)
         return
     path = self.path
     if not path.endswith('/'):
@@ -86,12 +85,31 @@ def call_appropriate_handler(self: MyHTTPHandler, method: str):
             except Exception:
                 logger.exception('Exception when handling HTTP request')
             return
-    logger.info('%s %s %s %s', "Could not find handler for HTTP request path", path, "for method", method)
+
+    send404(self)
+    logger.info("No HTTP handler for %s: %s [from %s:%s]", method, path, self.client_address[0], self.client_address[1])
 
 
-def do_GET(self: MyHTTPHandler):
-    call_appropriate_handler(self, 'GET')
+def send404(self: MyHTTPHandler):
+    self.send_response(404)
+    self.send_header('Content-type', 'text/plain')
+    self.end_headers()
 
 
-def do_POST(self: MyHTTPHandler):
-    call_appropriate_handler(self, 'POST')
+def log_message(self: MyHTTPHandler, format_: str, *args: any) -> None:
+    try:
+        if len(args) >= 1 and isinstance(args[0], str):
+            if args[0].startswith('GET ') or args[0].startswith('POST '):
+                # supported method, no issue
+                return
+            else:
+                self.logger.warning('Unsupported method: %s. [from %s:%s]',
+                                    args[0], self.client_address[0], self.client_address[1])
+                return
+        elif len(args) >= 2 and isinstance(args[1], str) and args[1].startswith('Unsupported method ('):
+            # server logs twice if unsupported method, once handled above and the other is ignored here
+            return
+    except Exception as e:
+        # log the default issue below
+        pass
+    self.logger.warning(format_, *args)

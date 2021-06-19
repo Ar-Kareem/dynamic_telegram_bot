@@ -42,6 +42,7 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         setattr(self, as_name, bound_method)
 
     def log_message(self, format_: str, *args: any) -> None:
+        """Default implementation of logger"""
         if self.logger is not None:
             self.logger.info(format_, *args)
 
