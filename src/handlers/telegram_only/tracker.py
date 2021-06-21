@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext, Filters, MessageHandler
 
 from src.core.actions import TelegramBotInitiated
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.utils.affiliates import BaseAction
 
 logger = logging.getLogger(__name__)

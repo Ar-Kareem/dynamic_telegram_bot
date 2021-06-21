@@ -9,7 +9,7 @@ import time
 from telegram import Update, MessageEntity
 from telegram.ext import CallbackContext
 
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.handlers.serve_pdf.helper import PDFHelper, DICT_NAME
 
 try:

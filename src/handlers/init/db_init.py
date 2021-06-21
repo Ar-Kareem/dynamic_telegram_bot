@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import logging
 
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.utils.database import decompress, date_delete_callback, string_to_key
 
 logger = logging.getLogger(__name__)

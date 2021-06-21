@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 from src.core.actions import TelegramBotInitiated, AddServerHandler
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.utils.affiliates import BaseAction
 from src.utils.simple_server.simple_server import MyHTTPHandler
 

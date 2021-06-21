@@ -1,7 +1,7 @@
 import logging
 
 from src.core.actions import AddServerHandler
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.utils.simple_server.simple_server import MyHTTPHandler
 
 

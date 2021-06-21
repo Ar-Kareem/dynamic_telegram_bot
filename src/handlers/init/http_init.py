@@ -3,7 +3,7 @@ from functools import partial
 import os
 
 from src.core.actions import Terminate, AddServerHandler
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server
 
 logger = logging.getLogger(__name__)

@@ -37,7 +37,7 @@ def init_config(config_path=None) -> ConfigParser:
             config.read(config_path)
 
         if len(config.sections()) == 0:
-            raise FileNotFoundError('No sections found in settings.ini file: (%s)' % config_path)
+            raise FileNotFoundError('No file found / no sections found in settings.ini file: (%s)' % config_path)
 
         return config
     except Exception:

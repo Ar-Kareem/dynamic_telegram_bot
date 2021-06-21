@@ -5,7 +5,7 @@ from telegram.ext import CommandHandler
 
 from src.utils.affiliates import BaseAction
 from src.core.actions import TelegramBotInitiated, AddServerHandler
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 import src.handlers.serve_pdf.telegram_handler as telegram_handler
 import src.handlers.serve_pdf.http_handler as http_handler
 from src.handlers.serve_pdf.helper import PDFHelper, DICT_NAME

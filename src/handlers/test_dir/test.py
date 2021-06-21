@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
 from src.core.actions import TelegramBotInitiated, AddServerHandler, TelegramMessageToMe, Terminate
-from src.core.start import Pocket
+from src.core.pocket import Pocket
 from src.utils.affiliates import BaseAction
 from src.utils.simple_server.simple_server import MyHTTPHandler
 

@@ -1,7 +1,7 @@
 If server doesn't work when running in WSL then try to connect to it using localhost:PORT
 4 different access levels:
     1- localhost
-    2- wsl ip
+    2- wsl ip (in powershell "wsl hostname -I" then get /index/ with correct port and https://)
     3- computer ip
     4- external ip
 2-4 seem to not work.
