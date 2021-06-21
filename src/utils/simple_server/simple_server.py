@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from http.cookies import SimpleCookie
+from http.cookies import SimpleCookie, Morsel
+from urllib.parse import quote
 import threading
 import socket
 import logging
@@ -55,6 +56,24 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
     def set_simple_cookie(self, sc: SimpleCookie) -> None:
         for morsel in sc.values():
             self.send_header("Set-Cookie", morsel.OutputString())
+
+    @staticmethod
+    def get_morsel(name, value, expires=-1, domain=None,
+                   secure=False, httponly=False, path=None):
+        morsel = Morsel()
+        morsel.set(name, value, quote(value))
+        if expires < 0:
+            expires = -1000000000
+        morsel['expires'] = expires
+        morsel['path'] = path
+        if domain:
+            morsel['domain'] = domain
+        if secure:
+            morsel['secure'] = secure
+        value = morsel.OutputString()
+        if httponly:
+            value += '; httponly'
+        return morsel
 
 
 def start_server(handler: MyHTTPHandler, hostname: str = None,
