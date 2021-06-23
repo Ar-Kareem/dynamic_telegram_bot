@@ -2,34 +2,23 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.cookies import SimpleCookie, Morsel
+from typing import List, Type
 from urllib.parse import quote
 import threading
 import socket
 import logging
-from logging import Logger
 
 
 logger = logging.getLogger(__name__)
 
 
 class MyHTTPHandler(BaseHTTPRequestHandler):
-    """
-    This class can be used with an HTTPServer as if it is a BaseHTTPRequestHandler
-    The difference is that an HTTPServer creates a new instance of BaseHTTPRequestHandler for every request
-    which means that no variables can persist throughout the request handler instance.
-    This class helps by allowing it to be initialized and be assigned instance variables,
-    whenever httpserver attempts to initialize the request handler (__call__ will be invoked).
-    This only works because super().__init__ is safe to be invoked multiple times.
-    This can be thought of as a metaclass except it's not.
-    """
-    # noinspection PyMissingConstructor
-    def __init__(self, logger: Logger = None):
-        # do not call super yet.
-        self.logger = logger
+    pocket = None
+    logger = None
 
-    def __call__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        return self
+        self.path_split: List[str] = []
 
     def bind(self, func, as_name: str = None) -> None:
         """
@@ -43,8 +32,10 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         setattr(self, as_name, bound_method)
 
     def log_message(self, format_: str, *args: any) -> None:
-        """Default implementation of logger"""
-        if self.logger is not None:
+        """Default implementation of logger. This should be overridden by a logger implementation"""
+        if self.logger is None:
+            super().log_message(format_, *args)
+        else:
             self.logger.info(format_, *args)
 
     def read_simple_cookie(self) -> SimpleCookie:
@@ -76,7 +67,7 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         return morsel
 
 
-def start_server(handler: MyHTTPHandler, hostname: str = None,
+def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None,
                  localhost: bool = False, port: int = 8049,
                  ssl_cert_key_paths: list = None, timeout: int = None) -> HTTPServer:
     if hostname is None:
@@ -123,9 +114,10 @@ def __set_timeout(timeout):
 
 
 def main():
-    makeshift_logger = type('l', (), {'info': print})()
-    # webserver = HTTPServer((socket.gethostname(), 8092), MyHTTPHandler(logger=makeshift_logger))
-    webserver = HTTPServer(('0.0.0.0', 8091), MyHTTPHandler(logger=makeshift_logger))
+    class Child(MyHTTPHandler):
+        logger = type('l', (), {'info': print})()
+    # webserver = HTTPServer((socket.gethostname(), 8092), Child)
+    webserver = HTTPServer(('0.0.0.0', 8091), Child)
     # import ssl
     # webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=_get_cert_path(),
     #                                    keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)

@@ -13,7 +13,6 @@ def init(pocket: Pocket):
 def serve_favicon(self: MyHTTPHandler):
     self.send_response(200)
     self.send_header('Content-type', 'image/png')
-    self.end_headers()
     d: dict = self.pocket.get(__file__)
     if 'favicon.ico' in d:
         self.wfile.write(d['favicon.ico'])

@@ -47,7 +47,6 @@ def init(pocket: Pocket):
 def get_index(self: MyHTTPHandler):
     self.send_response(200)
     self.send_header("Content-type", "text/html")
-    self.end_headers()
     self.wfile.write(bytes("<html><head><title>Response</title></head>", "utf-8"))
     self.wfile.write(bytes("<body>", "utf-8"))
     from ..init.http_init import DICT_NAME
@@ -63,7 +62,6 @@ def get_handler(self: MyHTTPHandler):
 
     self.send_response(200)
     self.send_header("Content-type", "text/html")
-    self.end_headers()
     self.wfile.write(bytes("<html><head><title>Response</title></head>", "utf-8"))
     self.wfile.write(bytes("<p>Request: %s | Counter: %d</p>" % (self.path, self.counter), "utf-8"))
     self.wfile.write(bytes("<body>", "utf-8"))
@@ -78,7 +76,6 @@ def get_handler(self: MyHTTPHandler):
 def test_post_handler(self: MyHTTPHandler):
     self.send_response(200)
     self.send_header('Content-type', 'text/plain')
-    self.end_headers()
     content_length = int(self.headers['Content-Length'])
     if content_length > 5*1024*1024:
         return
@@ -100,7 +97,6 @@ def test_cookie(self: MyHTTPHandler):
     c['t'] = '44'
     c['t']['max-age'] = 4
     self.set_simple_cookie(c)
-    self.end_headers()
 
     favicon = '<img src="/favicon.ico" alt="testtt" style="width:50px;height:50px;">'
     divfavicon = f'<div>{favicon*15}</div>'

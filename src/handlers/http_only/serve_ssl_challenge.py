@@ -20,6 +20,5 @@ def serve_challenge(self: MyHTTPHandler):
     self.send_response(200)
     self.send_header('Content-type', 'application/notepad')
     self.send_header('Content-Disposition', 'attachment; filename="challenge.txt"')
-    self.end_headers()
     self.wfile.write(bytes(challenge, "utf-8"))
 

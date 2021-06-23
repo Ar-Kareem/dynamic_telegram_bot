@@ -49,18 +49,15 @@ def handle_asset(self: MyHTTPHandler):
     except InternalServerError as e:
         self.send_response(e.status)
         self.send_header('Content-type', 'application/json')
-        self.end_headers()
         self.wfile.write(json.dumps({'status': e.status, 'error': e.message}).encode('utf-8'))
         return
     except Exception as e:
         self.send_response(500)
         self.send_header('Content-type', 'application/json')
-        self.end_headers()
         self.wfile.write(json.dumps({'status': 500, 'error': 'Exception occured. Check logs'}).encode('utf-8'))
         return
     self.send_response(200)
     self.send_header('Content-type', 'text/html')
-    self.end_headers()
     self.wfile.write(resp)
 
 
@@ -74,18 +71,15 @@ def handle_post(self: MyHTTPHandler):
     except InternalServerError as e:
         self.send_response(e.status)
         self.send_header('Content-type', 'application/json')
-        self.end_headers()
         self.wfile.write(json.dumps({'status': e.status, 'error': e.message}).encode('utf-8'))
         return
     except Exception as e:
         self.send_response(500)
         self.send_header('Content-type', 'application/json')
-        self.end_headers()
         self.wfile.write(json.dumps({'status': 500, 'error': 'Exception occured. Check logs'}).encode('utf-8'))
         return
     self.send_response(200)
     self.send_header('Content-type', 'application/json')
-    self.end_headers()
     self.wfile.write(resp)
 
 

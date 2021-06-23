@@ -18,19 +18,16 @@ def get_pdf_html_page(self: MyHTTPHandler):
     except Exception as ex:
         logger.error(ex)
         self.send_response(403)
-        self.end_headers()
         return
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
         self.send_response(403)
-        self.end_headers()
         return
 
     # prepare html
     self.send_response(200)
     self.send_header("Content-type", "text/html")
-    self.end_headers()
 
     prev_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num-1}" class="button green">Prev</a>' if page_num > 0 else ''
     next_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num+1}" class="button blue">Next</a>' \
@@ -80,17 +77,14 @@ def get_pdf_image(self: MyHTTPHandler):
         page_num = int(self.path.split('/')[4])
     except Exception:
         self.send_response(403)
-        self.end_headers()
         return
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
         self.send_response(403)
-        self.end_headers()
         return
     self.send_response(200)
     self.send_header('Content-type', 'image/jpg')
-    self.end_headers()
     with open(page_path, 'rb') as f:
         self.wfile.write(f.read())
 
@@ -101,17 +95,14 @@ def get_raw_pdf(self: MyHTTPHandler):
         pdf_id = str(pdf_id)
     except Exception:
         self.send_response(403)
-        self.end_headers()
         return
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     pdf_path = helper.get_pdf_path(pdf_id)
     if pdf_path is None:
         self.send_response(403)
-        self.end_headers()
         return
     self.send_response(200)
     self.send_header('Content-type', 'application/pdf')
-    self.end_headers()
     with open(pdf_path, 'rb') as f:
         self.wfile.write(f.read())
 
@@ -129,10 +120,8 @@ def get_database_status(self: MyHTTPHandler):
     else:
         self.send_response(404)
         self.send_header('Content-type', 'application/json')
-        self.end_headers()
         return
     self.send_response(200)
     self.send_header('Content-type', 'application/json')
-    self.end_headers()
     self.wfile.write(json.dumps(resp).encode('utf-8'))
 
