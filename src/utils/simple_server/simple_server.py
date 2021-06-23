@@ -99,17 +99,15 @@ def close_server(server: HTTPServer) -> None:
 
 
 # need to warn user if timeout is set multiple times since socket default timeout only supports single value overall
-__timeout_has_been_set = False
-__timeout_value = 0
+__timeout_value = -999.25
 
 
 def __set_timeout(timeout):
     socket.setdefaulttimeout(timeout)
-    global __timeout_has_been_set, __timeout_value
-    if __timeout_has_been_set and __timeout_value != timeout:
+    global __timeout_value
+    if __timeout_value != -999.25:
         logger.warning("timeout has been set multiple times. Overwriting and only taking latest value. "
                        "(no support for multiple servers with different timeouts)")
-    __timeout_has_been_set = True
     __timeout_value = timeout
 
 
