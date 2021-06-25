@@ -34,12 +34,12 @@ def init(pocket: Pocket):
 
 
 def from_telegram(self: MyHTTPHandler):
-    self.send_response(200)
-    self.send_header("Content-type", "text/html")
-    self.wfile.write(bytes("<html><head><title>Response</title></head>", "utf-8"))
-    self.wfile.write(bytes("<body>", "utf-8"))
+    self.response.set_response_code(200)
+    self.response.add_header("Content-type", "text/html")
+    self.response.append_data(bytes("<html><head><title>Response</title></head>", "utf-8"))
+    self.response.append_data(bytes("<body>", "utf-8"))
     t = self.pocket.get(__name__).get('text', '')
     if t and (time.time() - self.pocket.get(__name__)['start_time']) < 5:
-        self.wfile.write(bytes('<div>%s</div>' % t, "utf-8"))
-    self.wfile.write(bytes("</body></html>", "utf-8"))
+        self.response.append_data(bytes('<div>%s</div>' % t, "utf-8"))
+    self.response.append_data(bytes("</body></html>", "utf-8"))
 

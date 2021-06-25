@@ -17,17 +17,17 @@ def get_pdf_html_page(self: MyHTTPHandler):
         page_num = int(self.path.split('/')[4])
     except Exception as ex:
         logger.error(ex)
-        self.send_response(403)
+        self.response.set_response_code(403)
         return
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
-        self.send_response(403)
+        self.response.set_response_code(403)
         return
 
     # prepare html
-    self.send_response(200)
-    self.send_header("Content-type", "text/html")
+    self.response.set_response_code(200)
+    self.response.add_header("Content-type", "text/html")
 
     prev_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num-1}" class="button green">Prev</a>' if page_num > 0 else ''
     next_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num+1}" class="button blue">Next</a>' \
@@ -67,7 +67,7 @@ def get_pdf_html_page(self: MyHTTPHandler):
     </body>
     </html>
     '''
-    self.wfile.write(bytes(html, "utf-8"))
+    self.response.append_data(bytes(html, "utf-8"))
 
 
 def get_pdf_image(self: MyHTTPHandler):
@@ -76,17 +76,17 @@ def get_pdf_image(self: MyHTTPHandler):
         pdf_id = str(pdf_id)
         page_num = int(self.path.split('/')[4])
     except Exception:
-        self.send_response(403)
+        self.response.set_response_code(403)
         return
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
-        self.send_response(403)
+        self.response.set_response_code(403)
         return
-    self.send_response(200)
-    self.send_header('Content-type', 'image/jpg')
+    self.response.set_response_code(200)
+    self.response.add_header('Content-type', 'image/jpg')
     with open(page_path, 'rb') as f:
-        self.wfile.write(f.read())
+        self.response.append_data(f.read())
 
 
 def get_raw_pdf(self: MyHTTPHandler):
@@ -94,17 +94,17 @@ def get_raw_pdf(self: MyHTTPHandler):
         pdf_id = int(self.path.split('/')[3])
         pdf_id = str(pdf_id)
     except Exception:
-        self.send_response(403)
+        self.response.set_response_code(403)
         return
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     pdf_path = helper.get_pdf_path(pdf_id)
     if pdf_path is None:
-        self.send_response(403)
+        self.response.set_response_code(403)
         return
-    self.send_response(200)
-    self.send_header('Content-type', 'application/pdf')
+    self.response.set_response_code(200)
+    self.response.add_header('Content-type', 'application/pdf')
     with open(pdf_path, 'rb') as f:
-        self.wfile.write(f.read())
+        self.response.append_data(f.read())
 
 
 def get_database_status(self: MyHTTPHandler):
@@ -118,10 +118,10 @@ def get_database_status(self: MyHTTPHandler):
         size = os.path.getsize(helper.get_pdf_path(pdf_id))
         resp = {'pages': pages, 'size': size}
     else:
-        self.send_response(404)
-        self.send_header('Content-type', 'application/json')
+        self.response.set_response_code(404)
+        self.response.add_header('Content-type', 'application/json')
         return
-    self.send_response(200)
-    self.send_header('Content-type', 'application/json')
-    self.wfile.write(json.dumps(resp).encode('utf-8'))
+    self.response.set_response_code(200)
+    self.response.add_header('Content-type', 'application/json')
+    self.response.append_data(json.dumps(resp).encode('utf-8'))
 

@@ -1,4 +1,5 @@
 from typing import Dict
+from enum import Enum
 
 from src.utils import utils
 from src.utils.affiliates import Store, Reducer
@@ -19,3 +20,13 @@ class Pocket:
 
     def set(self, name: str, value: any) -> None:
         self.inner_pocket[name] = value
+
+
+class SharedDicts(Enum):
+    http_handler_dict = 'http_handler_dict'
+    SERVE_PDF = 'serve_pdf'
+
+
+class SharedDicts(Enum):
+    http_handler_dict = 'http_handler_dict'
+    SERVE_PDF = 'serve_pdf'

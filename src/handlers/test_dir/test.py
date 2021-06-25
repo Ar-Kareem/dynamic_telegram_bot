@@ -45,14 +45,14 @@ def init(pocket: Pocket):
 
 
 def get_index(self: MyHTTPHandler):
-    self.send_response(200)
-    self.send_header("Content-type", "text/html")
-    self.wfile.write(bytes("<html><head><title>Response</title></head>", "utf-8"))
-    self.wfile.write(bytes("<body>", "utf-8"))
+    self.response.set_response_code(200)
+    self.response.add_header("Content-type", "text/html")
+    self.response.append_data(bytes("<html><head><title>Response</title></head>", "utf-8"))
+    self.response.append_data(bytes("<body>", "utf-8"))
     from ..init.http_init import DICT_NAME
     for prefix, _ in self.pocket.inner_pocket.get(DICT_NAME, {}).get('GET', {}):
-        self.wfile.write(bytes('<div><a href="%s">%s</a></div>' % (prefix, prefix), "utf-8"))
-    self.wfile.write(bytes("</body></html>", "utf-8"))
+        self.response.append_data(bytes('<div><a href="%s">%s</a></div>' % (prefix, prefix), "utf-8"))
+    self.response.append_data(bytes("</body></html>", "utf-8"))
 
 
 def get_handler(self: MyHTTPHandler):
@@ -60,13 +60,13 @@ def get_handler(self: MyHTTPHandler):
         self.counter = 0
     self.counter += 1
 
-    self.send_response(200)
-    self.send_header("Content-type", "text/html")
-    self.wfile.write(bytes("<html><head><title>Response</title></head>", "utf-8"))
-    self.wfile.write(bytes("<p>Request: %s | Counter: %d</p>" % (self.path, self.counter), "utf-8"))
-    self.wfile.write(bytes("<body>", "utf-8"))
-    self.wfile.write(bytes("<p>Request Received.</p>", "utf-8"))
-    self.wfile.write(bytes("</body></html>", "utf-8"))
+    self.response.set_response_code(200)
+    self.response.add_header("Content-type", "text/html")
+    self.response.append_data(bytes("<html><head><title>Response</title></head>", "utf-8"))
+    self.response.append_data(bytes("<p>Request: %s | Counter: %d</p>" % (self.path, self.counter), "utf-8"))
+    self.response.append_data(bytes("<body>", "utf-8"))
+    self.response.append_data(bytes("<p>Request Received.</p>", "utf-8"))
+    self.response.append_data(bytes("</body></html>", "utf-8"))
     self.pocket.store.dispatch(TelegramMessageToMe(message=str(self.counter) + ' ' + self.path))
 
     if self.path.startswith('/reset') and self.counter > 1:
@@ -74,8 +74,8 @@ def get_handler(self: MyHTTPHandler):
 
 
 def test_post_handler(self: MyHTTPHandler):
-    self.send_response(200)
-    self.send_header('Content-type', 'text/plain')
+    self.response.set_response_code(200)
+    self.response.add_header('Content-type', 'text/plain')
     content_length = int(self.headers['Content-Length'])
     if content_length > 5*1024*1024:
         return
@@ -85,8 +85,8 @@ def test_post_handler(self: MyHTTPHandler):
 
 
 def test_cookie(self: MyHTTPHandler):
-    self.send_response(200)
-    self.send_header("Content-type", "text/html")
+    self.response.set_response_code(200)
+    self.response.add_header("Content-type", "text/html")
 
     c = self.read_simple_cookie()
     print(c, c['t'] if 't' in c else None)
@@ -110,4 +110,4 @@ def test_cookie(self: MyHTTPHandler):
     </body>
     </html>
     '''
-    self.wfile.write(bytes(html, "utf-8"))
+    self.response.append_data(bytes(html, "utf-8"))

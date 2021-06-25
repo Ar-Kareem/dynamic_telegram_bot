@@ -17,8 +17,8 @@ def init(pocket: Pocket):
 
 def serve_challenge(self: MyHTTPHandler):
     challenge = self.pocket.config.get('SERVER SSL CHALLENGE', 'challenge_text')
-    self.send_response(200)
-    self.send_header('Content-type', 'application/notepad')
-    self.send_header('Content-Disposition', 'attachment; filename="challenge.txt"')
-    self.wfile.write(bytes(challenge, "utf-8"))
+    self.response.set_response_code(200)
+    self.response.add_header('Content-type', 'application/notepad')
+    self.response.add_header('Content-Disposition', 'attachment; filename="challenge.txt"')
+    self.response.set_data(bytes(challenge, "utf-8"))
 

@@ -11,11 +11,11 @@ def init(pocket: Pocket):
 
 
 def serve_favicon(self: MyHTTPHandler):
-    self.send_response(200)
-    self.send_header('Content-type', 'image/png')
+    self.response.set_response_code(200)
+    self.response.add_header('Content-type', 'image/png')
     d: dict = self.pocket.get(__file__)
     if 'favicon.ico' in d:
-        self.wfile.write(d['favicon.ico'])
+        self.response.append_data(d['favicon.ico'])
         return
     favicon_path = Path(self.pocket.database_dir / 'misc' / 'favicon.ico')
     if not favicon_path.exists():
@@ -23,4 +23,4 @@ def serve_favicon(self: MyHTTPHandler):
         return
     with open(favicon_path, 'rb') as f:
         d['favicon.ico'] = f.read()
-        self.wfile.write(d['favicon.ico'])
+        self.response.append_data(d['favicon.ico'])
