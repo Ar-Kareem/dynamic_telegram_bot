@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-
+from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.cookies import SimpleCookie, Morsel
-from typing import List, Type
+from typing import List, Type, Union, Tuple
 from urllib.parse import quote
+import json
+import html
 import threading
 import socket
 import logging
@@ -12,13 +14,61 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class InternalServerError(Exception):
+    def __init__(self, status=HTTPStatus.INTERNAL_SERVER_ERROR, user_message='', cause=''):
+        self.status = status
+        self.user_message = user_message
+        if len(cause) > 0:
+            self.cause = cause
+        else:
+            self.cause = self.user_message
+        super().__init__(self.cause)
+
+
+class HTTPResponse:
+    """
+    This class is needed since the order of assignment of parameters in BaseHTTPRequestHandler is critical.
+    Thus, this class helps collect all the parameters in any order then assign all in proper order at the end
+    """
+    def __init__(self, response_code: int = HTTPStatus.INTERNAL_SERVER_ERROR,
+                 headers: List[Tuple[str, str]] = None, data: Union[bytearray, bytes] = b''):
+        self._response_code: int = response_code
+        self._headers = []
+        if headers is not None:
+            self._headers = headers
+        self._data: bytearray = bytearray(data)
+
+    def set_response_code(self, response_code: int):
+        self._response_code = response_code
+
+    def add_header(self, key: str, val: str):
+        self._headers.append((key, val))
+
+    def set_data(self, data: Union[bytearray, bytes, str]):
+        if isinstance(data, str):
+            self._data = bytearray(data.encode())
+        else:
+            self._data = bytearray(data)
+
+    def append_data(self, data: Union[bytearray, bytes, str]):
+        if isinstance(data, str):
+            self._data.extend(data.encode())
+        else:
+            self._data.extend(data)
+
+    def set_simple_cookie(self, sc: SimpleCookie):
+        for morsel in sc.values():
+            self.add_header("Set-Cookie", morsel.OutputString())
+
+
 class MyHTTPHandler(BaseHTTPRequestHandler):
     pocket = None
     logger = None
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.path_split: List[str] = []
+        self.response = HTTPResponse()
+        super().__init__(*args, **kwargs)
 
     def bind(self, func, as_name: str = None) -> None:
         """
@@ -30,6 +80,9 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
             as_name = func.__name__
         bound_method = func.__get__(self, self.__class__)
         setattr(self, as_name, bound_method)
+
+    def version_string(self):
+        return 'nginx'
 
     def log_message(self, format_: str, *args: any) -> None:
         """Default implementation of logger. This should be overridden by a logger implementation"""
@@ -44,9 +97,41 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
             sc.load(self.headers.get('Cookie'))
         return sc
 
-    def set_simple_cookie(self, sc: SimpleCookie) -> None:
-        for morsel in sc.values():
-            self.send_header("Set-Cookie", morsel.OutputString())
+    # noinspection PyProtectedMember
+    def assign_response_data(self):
+        resp = self.response
+
+        super().send_response(resp._response_code)
+        for (k, v) in resp._headers:
+            super().send_header(k, v)
+
+        if resp._response_code >= 400:  # error response
+            super().send_header('Connection', 'close')
+            if self.command == 'GET':  # GET: prepare an html page with error explanation
+                super().send_header("Content-Type", "text/html;charset=utf-8")
+                try:
+                    message = self.responses[resp._response_code][0]
+                except KeyError:
+                    message = '???'
+                resp.set_data(
+                    (self.error_message_format % {
+                        'code': resp._response_code,
+                        'message': html.escape(message, quote=False),
+                        'explain': html.escape(resp._data.decode(), quote=False)
+                    }).encode('UTF-8', 'replace')
+                )
+            elif self.command == 'POST':  # POST: prepare a json response with error explanation
+                super().send_header("Content-Type", "application/json")
+                resp.set_data(json.dumps(
+                        {'response': resp._response_code, 'error': resp._data.decode()}
+                    ).encode('utf-8'))
+            else:
+                super().send_header("Content-Type", "text/html")
+                resp.set_data(b'')
+                logger.warning('Unknown HTTP command. This should never happen.')
+        super().send_header('Content-Length', str(len(resp._data)))
+        super().end_headers()
+        self.wfile.write(resp._data)
 
     @staticmethod
     def get_morsel(name, value, expires=-1, domain=None,
@@ -105,7 +190,7 @@ __timeout_value = -999.25
 def __set_timeout(timeout):
     socket.setdefaulttimeout(timeout)
     global __timeout_value
-    if __timeout_value != -999.25:
+    if __timeout_value != -999.25 and __timeout_value != timeout:
         logger.warning("timeout has been set multiple times. Overwriting and only taking latest value. "
                        "(no support for multiple servers with different timeouts)")
     __timeout_value = timeout

@@ -3,10 +3,12 @@ from functools import partial
 import os
 import base64
 import secrets
+from http import HTTPStatus
 
 from src.core.actions import Terminate, AddServerHandler
 from src.core.pocket import Pocket
-from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server
+from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server, HTTPResponse, \
+    InternalServerError
 
 logger = logging.getLogger(__name__)
 DICT_NAME = 'http_handler_dict'
@@ -63,27 +65,31 @@ class CustomHandler(MyHTTPHandler):
 
     def handle_http_request(self, method: str):
         module_dict: dict = self.pocket.get(DICT_NAME)
-        handlers = module_dict.get(method)  # dict from path to dynamically attached controller
-        if handlers is None:  # no handlers for the method (GET/POST)
-            self.send_error(404)
-            return
+        handlers = module_dict.setdefault(method, [])  # dict from path to dynamically attached controller
         path = self.path
         if not path.endswith('/'):
             path += '/'
         self.path_split = path.split('/')  # helpful variable is a list of the requested path
         for prefix, handler in handlers:
-            if path.startswith(prefix):
+            if path.startswith(prefix):  # valid path found
                 self.capture_statistics(True)
                 # self.new_request()
                 try:
                     handler(self)
-                    self.end_headers()
-                except Exception:
-                    logger.exception('Exception when handling HTTP request')
+                except InternalServerError as e:
+                    self.response.set_response_code(e.status)
+                    self.response.set_data(e.user_message)
+                    logger.exception('Internal server error.')
+                except Exception as e:
+                    self.response.set_response_code(HTTPStatus.INTERNAL_SERVER_ERROR)
+                    self.response.set_data(b'UNEXPECTED ERROR.')
+                    logger.exception('Unexpected exception when handling HTTP request')
+                self.assign_response_data()
                 return
 
         self.capture_statistics(False)
-        self.send_error(404)
+        self.response.set_response_code(HTTPStatus.NOT_FOUND)
+        self.assign_response_data()
         logger.warning("No HTTP handler for %s: %s [from %s:%s]",
                        method, path, self.client_address[0], self.client_address[1])
 
@@ -91,7 +97,7 @@ class CustomHandler(MyHTTPHandler):
         sc = self.read_simple_cookie()
         if 'sess' not in sc:
             morsel = get_new_sess_morsel()  # get a new session token
-            self.send_header("Set-Cookie", morsel.OutputString())  # assign it to request
+            self.response.add_header("Set-Cookie", morsel.OutputString())  # assign it to request
             return
         sess = sc['sess']
         print(sess)
