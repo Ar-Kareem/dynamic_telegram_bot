@@ -96,7 +96,7 @@ def test_cookie(self: MyHTTPHandler):
     c[t]['max-age'] = 4
     c['t'] = '44'
     c['t']['max-age'] = 4
-    self.set_simple_cookie(c)
+    self.response.set_simple_cookie(c)
 
     favicon = '<img src="/favicon.ico" alt="testtt" style="width:50px;height:50px;">'
     divfavicon = f'<div>{favicon*15}</div>'

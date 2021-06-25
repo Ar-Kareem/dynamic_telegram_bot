@@ -25,8 +25,3 @@ class Pocket:
 class SharedDicts(Enum):
     http_handler_dict = 'http_handler_dict'
     SERVE_PDF = 'serve_pdf'
-
-
-class SharedDicts(Enum):
-    http_handler_dict = 'http_handler_dict'
-    SERVE_PDF = 'serve_pdf'

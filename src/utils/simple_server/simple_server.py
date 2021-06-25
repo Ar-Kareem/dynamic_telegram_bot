@@ -82,7 +82,7 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         setattr(self, as_name, bound_method)
 
     def version_string(self):
-        return 'nginx'
+        return 'nginx'  # we do a little trolling
 
     def log_message(self, format_: str, *args: any) -> None:
         """Default implementation of logger. This should be overridden by a logger implementation"""

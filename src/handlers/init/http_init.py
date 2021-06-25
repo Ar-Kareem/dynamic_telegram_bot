@@ -79,11 +79,13 @@ class CustomHandler(MyHTTPHandler):
                 except InternalServerError as e:
                     self.response.set_response_code(e.status)
                     self.response.set_data(e.user_message)
-                    logger.exception('Internal server error.')
+                    logger.warning('Internal server error. [from %s] [to %s]. Cause: %s',
+                                   self.client_address[0], self.path, e.cause)
                 except Exception as e:
                     self.response.set_response_code(HTTPStatus.INTERNAL_SERVER_ERROR)
-                    self.response.set_data(b'UNEXPECTED ERROR.')
-                    logger.exception('Unexpected exception when handling HTTP request')
+                    self.response.set_data(b'UNEXPECTED INTERNAL SERVER ERROR.')
+                    logger.exception('Unexpected exception when handling HTTP request [from %s] [to %s]',
+                                     self.client_address[0], self.path)
                 self.assign_response_data()
                 return
 
