@@ -4,6 +4,7 @@ import os
 import base64
 import secrets
 from http import HTTPStatus
+from typing import NamedTuple, Dict
 
 from src.core.actions import Terminate, AddServerHandler
 from src.core.pocket import Pocket
@@ -39,6 +40,7 @@ def init(pocket: Pocket):
 
     class Handler(CustomHandler):
         pocket = pocket_to_inject
+        sessionManager = SessionManager()
 
     try:
         http_server = start_server(Handler, localhost=localhost, port=server_port,
@@ -52,10 +54,36 @@ def init(pocket: Pocket):
     pocket.reducer.register_handler(trigger=AddServerHandler, callback=partial(add_server_handler, pocket=pocket))
 
 
+class SessionManager:
+    Session = NamedTuple('Session',
+                         [('ip', str),
+                          ('sess_dict', dict)])
+
+    def __init__(self):
+        self.__all_sessions: Dict[str, SessionManager.Session] = {}
+
+    def retrieve_sess(self, ip, sess_key):
+        if sess_key in self.__all_sessions:
+            sess = self.__all_sessions[sess_key]
+            if sess.ip == ip:
+                return sess.sess_dict
+        return None
+
+    def register_new_sess(self, ip):
+        noise = secrets.token_bytes(42)
+        b64 = base64.b64encode(noise).decode()
+        b64 = b64.replace('+', '-')  # http will need to encode + so just replace with -
+        new_sess = SessionManager.Session(ip=ip, sess_dict={})
+        self.__all_sessions[b64] = new_sess
+        return MyHTTPHandler.get_morsel('sess', b64, expires=365 * 24 * 60 * 60, path='/')
+
+
 class CustomHandler(MyHTTPHandler):
     """Custom handler to route requests, implement sessions, and track ips"""
     logger = logger
     pocket: Pocket
+    sessionManager: SessionManager
+    session: dict
 
     def do_POST(self):
         self.handle_http_request('POST')
@@ -72,8 +100,8 @@ class CustomHandler(MyHTTPHandler):
         self.path_split = path.split('/')  # helpful variable is a list of the requested path
         for prefix, handler in handlers:
             if path.startswith(prefix):  # valid path found
+                self.load_session()
                 self.capture_statistics(True)
-                # self.new_request()
                 try:
                     handler(self)
                 except InternalServerError as e:
@@ -81,31 +109,39 @@ class CustomHandler(MyHTTPHandler):
                     self.response.set_data(e.user_message)
                     logger.warning('Internal server error. [from %s] [to %s]. Cause: %s',
                                    self.client_address[0], self.path, e.cause)
+                    self.assign_response_data()
                 except Exception as e:
                     self.response.set_response_code(HTTPStatus.INTERNAL_SERVER_ERROR)
                     self.response.set_data(b'UNEXPECTED INTERNAL SERVER ERROR.')
                     logger.exception('Unexpected exception when handling HTTP request [from %s] [to %s]',
                                      self.client_address[0], self.path)
+                    self.assign_response_data()
+
+                if self.session is None:
+                    self.register_user()
+                else:
+                    self.session['count'] = self.session.setdefault('count', 0) + 1
+                    print(self.client_address[0], self.session['count'])
                 self.assign_response_data()
                 return
 
         self.capture_statistics(False)
-        self.response.set_response_code(HTTPStatus.NOT_FOUND)
-        self.assign_response_data()
-        logger.warning("No HTTP handler for %s: %s [from %s:%s]",
-                       method, path, self.client_address[0], self.client_address[1])
+        super().send_response(HTTPStatus.NOT_FOUND)
+        super().end_headers()
+        logger.warning("No HTTP handler for %s: %s [from %s:%s]", method, path, *self.client_address[0:2])
 
-    def new_request(self):
+    def load_session(self):
         sc = self.read_simple_cookie()
         if 'sess' not in sc:
-            morsel = get_new_sess_morsel()  # get a new session token
-            self.response.add_header("Set-Cookie", morsel.OutputString())  # assign it to request
             return
-        sess = sc['sess']
-        print(sess)
+        self.session = self.sessionManager.retrieve_sess(self.client_address[0], sc['sess'].value)
+
+    def register_user(self):
+        morsel = self.sessionManager.register_new_sess(self.client_address[0])
+        self.response.add_header("Set-Cookie", morsel.OutputString())  # assign it to request
 
     def capture_statistics(self, hit: bool):
-        print(self.client_address[0], hit)
+        print(self.client_address[0], hit, self.path)
 
     def log_message(self, format_: str, *args: any) -> None:
         try:
@@ -114,13 +150,13 @@ class CustomHandler(MyHTTPHandler):
                     # supported method, no issue
                     return
                 else:
-                    self.logger.warning('Unsupported method: %s. [from %s:%s]',
-                                        args[0], self.client_address[0], self.client_address[1])
+                    self.logger.warning('Unsupported method: %s. [%s] [from %s:%s]',
+                                        args[0], self.path, self.client_address[0], self.client_address[1])
                     return
             elif len(args) >= 2 and isinstance(args[1], str) and args[1].startswith('Unsupported method ('):
                 # server logs twice if unsupported method, once handled above and the other is ignored here
                 return
-            self.logger.warning(format_, *args)
+            self.logger.warning(format_ + ' [from % s: % s]', *args, *self.client_address[0:2])
         except Exception as e:
             self.logger.exception(e)
 
@@ -139,10 +175,3 @@ def add_server_handler(action: AddServerHandler, pocket: Pocket):
             return
     t = (action.prefix_to_handle, action.handler)
     module_dict.setdefault(method, []).append(t)
-
-
-def get_new_sess_morsel():
-    noise = secrets.token_bytes(42)
-    b64 = base64.b64encode(noise).decode()
-    b64 = b64.replace('+', '-')  # http will need to encode + so just replace with -
-    return MyHTTPHandler.get_morsel('sess', b64, expires=60, path='/')

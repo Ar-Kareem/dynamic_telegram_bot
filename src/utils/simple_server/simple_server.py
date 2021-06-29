@@ -64,6 +64,8 @@ class HTTPResponse:
 class MyHTTPHandler(BaseHTTPRequestHandler):
     pocket = None
     logger = None
+    sessionManager = None
+    session = None
 
     def __init__(self, *args, **kwargs):
         self.path_split: List[str] = []
