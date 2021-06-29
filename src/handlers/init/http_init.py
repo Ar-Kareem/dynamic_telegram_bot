@@ -92,43 +92,50 @@ class CustomHandler(MyHTTPHandler):
         self.handle_http_request('GET')
 
     def handle_http_request(self, method: str):
+        """Main routing function that all HTTP requests go through"""
         module_dict: dict = self.pocket.get(DICT_NAME)
         handlers = module_dict.setdefault(method, [])  # dict from path to dynamically attached controller
         path = self.path
         if not path.endswith('/'):
             path += '/'
         self.path_split = path.split('/')  # helpful variable is a list of the requested path
+        matching_controller = None
         for prefix, handler in handlers:
             if path.startswith(prefix):  # valid path found
-                self.load_session()
-                self.capture_statistics(True)
-                try:
-                    handler(self)
-                except InternalServerError as e:
-                    self.response.set_response_code(e.status)
-                    self.response.set_data(e.user_message)
-                    logger.warning('Internal server error. [from %s] [to %s]. Cause: %s',
-                                   self.client_address[0], self.path, e.cause)
-                    self.assign_response_data()
-                except Exception as e:
-                    self.response.set_response_code(HTTPStatus.INTERNAL_SERVER_ERROR)
-                    self.response.set_data(b'UNEXPECTED INTERNAL SERVER ERROR.')
-                    logger.exception('Unexpected exception when handling HTTP request [from %s] [to %s]',
-                                     self.client_address[0], self.path)
-                    self.assign_response_data()
+                matching_controller = handler
+                break
+        if matching_controller is None:  # no valid controller found
+            self.capture_statistics(False)
+            super().send_response(HTTPStatus.NOT_FOUND)
+            super().end_headers()
+            logger.warning("No HTTP handler for %s: %s [from %s:%s]", method, path, *self.client_address[0:2])
+            return
 
-                if self.session is None:
-                    self.register_user()
-                else:
-                    self.session['count'] = self.session.setdefault('count', 0) + 1
-                    print(self.client_address[0], self.session['count'])
-                self.assign_response_data()
-                return
+        self.load_session()
+        self.capture_statistics(True)
+        try:
+            matching_controller(self)
+        except InternalServerError as e:
+            self.response.set_response_code(e.status)
+            self.response.set_data(e.user_message)
+            logger.warning('Internal server error. [from %s] [to %s]. Cause: %s',
+                           self.client_address[0], self.path, e.cause)
+            self.assign_response_data()
+            return
+        except Exception as e:
+            self.response.set_response_code(HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.response.set_data(b'UNEXPECTED INTERNAL SERVER ERROR.')
+            logger.exception('Unexpected exception when handling HTTP request [from %s] [to %s]',
+                             self.client_address[0], self.path)
+            self.assign_response_data()
+            return
 
-        self.capture_statistics(False)
-        super().send_response(HTTPStatus.NOT_FOUND)
-        super().end_headers()
-        logger.warning("No HTTP handler for %s: %s [from %s:%s]", method, path, *self.client_address[0:2])
+        if self.session is None:
+            self.register_user()
+        else:
+            self.session['count'] = self.session.setdefault('count', 0) + 1
+            print(self.client_address[0], self.session['count'])
+        self.assign_response_data()
 
     def load_session(self):
         sc = self.read_simple_cookie()
