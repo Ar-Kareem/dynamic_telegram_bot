@@ -1,11 +1,11 @@
 import logging
 import os
 import json
+from http import HTTPStatus
 
 from src.handlers.serve_pdf.helper import PDFHelper, DICT_NAME
 
-from src.utils.simple_server.simple_server import MyHTTPHandler
-
+from src.utils.simple_server.simple_server import MyHTTPHandler, InternalServerError
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +15,12 @@ def get_pdf_html_page(self: MyHTTPHandler):
         pdf_id = int(self.path.split('/')[3])
         pdf_id = str(pdf_id)
         page_num = int(self.path.split('/')[4])
-    except Exception as ex:
-        logger.error(ex)
-        self.response.set_response_code(403)
-        return
+    except Exception as e:
+        raise InternalServerError(status=HTTPStatus.BAD_REQUEST, user_message='Improper PDF ID/NUM.', cause=repr(e))
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     page_path = helper.get_page_path(pdf_id, page_num)
     if page_path is None:
-        self.response.set_response_code(403)
-        return
+        raise InternalServerError(status=HTTPStatus.BAD_REQUEST, user_message='Page not found.')
 
     # prepare html
     self.response.set_response_code(200)
@@ -93,14 +90,12 @@ def get_raw_pdf(self: MyHTTPHandler):
     try:
         pdf_id = int(self.path.split('/')[3])
         pdf_id = str(pdf_id)
-    except Exception:
-        self.response.set_response_code(403)
-        return
+    except Exception as e:
+        raise InternalServerError(status=HTTPStatus.BAD_REQUEST, user_message='Improper PDF ID.', cause=repr(e))
     helper: PDFHelper = self.pocket.get(DICT_NAME)
     pdf_path = helper.get_pdf_path(pdf_id)
-    if pdf_path is None:
-        self.response.set_response_code(403)
-        return
+    if not pdf_path.exists():
+        raise InternalServerError(status=HTTPStatus.BAD_REQUEST, user_message='ID does not exist.')
     self.response.set_response_code(200)
     self.response.add_header('Content-type', 'application/pdf')
     with open(pdf_path, 'rb') as f:
@@ -118,9 +113,7 @@ def get_database_status(self: MyHTTPHandler):
         size = os.path.getsize(helper.get_pdf_path(pdf_id))
         resp = {'pages': pages, 'size': size}
     else:
-        self.response.set_response_code(404)
-        self.response.add_header('Content-type', 'application/json')
-        return
+        raise InternalServerError(status=HTTPStatus.NOT_FOUND, user_message='Improper path URI.')
     self.response.set_response_code(200)
     self.response.add_header('Content-type', 'application/json')
     self.response.append_data(json.dumps(resp).encode('utf-8'))
