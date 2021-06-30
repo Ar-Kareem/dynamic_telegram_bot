@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import List, NamedTuple, Type, Union, Tuple, Callable, Optional
+from typing import List, NamedTuple, Type, Union, Tuple, Callable, Optional, Dict
 from abc import ABC
 
 import logging
@@ -79,7 +79,7 @@ class Store:
                          ('lock', threading.Lock)])
 
     def __init__(self):
-        self._store: dict[type, Store._Shelf] = dict()
+        self._store: Dict[type, Store._Shelf] = dict()
         self._lock = threading.Lock()
 
     def get_new_subscriber(self) -> Subscriber:

@@ -1,7 +1,6 @@
 import logging
 from typing import Optional, Callable
 from urllib import request
-from pathlib import Path
 import os
 
 
@@ -51,7 +50,7 @@ class PDFHelper:
         for i, page in enumerate(pages):
             page.save(self.get_page_path(dir_id, i), 'JPEG')
 
-    def get_number_of_pages(self, dir_id: int) -> Optional[int]:
+    def get_number_of_pages(self, dir_id: str) -> Optional[int]:
         if dir_id not in self.pdf_len_cache:
             self.pdf_len_cache[dir_id] = len(os.listdir(self.output_dir_path / dir_id)) - 1
         return self.pdf_len_cache[dir_id]
@@ -63,4 +62,3 @@ class PDFHelper:
         if make_dir:
             (self.output_dir_path / dir_id).mkdir()
         return self.output_dir_path / dir_id / self.output_pdf_name
-

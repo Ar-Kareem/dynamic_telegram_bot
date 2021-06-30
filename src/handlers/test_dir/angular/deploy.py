@@ -38,7 +38,7 @@ def handle_asset(self: MyHTTPHandler):
     if asset_name not in dict_.get('asset_files'):
         raise InternalServerError(user_message='Unable to find requested asset')
 
-    # assets exists, check cache then check phsyical dir
+    # assets exists, check cache then check physical dir
     if asset_name in dict_.get('asset_files_cache'):
         resp = dict_.get('asset_files_cache')[asset_name]
     else:  # must read from file

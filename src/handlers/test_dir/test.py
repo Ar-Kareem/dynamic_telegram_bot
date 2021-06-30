@@ -1,6 +1,5 @@
 import json
 import logging
-from functools import partial
 from threading import Timer
 from http import cookies
 from time import time
@@ -8,9 +7,8 @@ from time import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
-from src.core.actions import TelegramBotInitiated, AddServerHandler, TelegramMessageToMe, Terminate
+from src.core.actions import AddServerHandler, TelegramMessageToMe, Terminate
 from src.core.pocket import Pocket
-from src.utils.affiliates import BaseAction
 from src.utils.simple_server.simple_server import MyHTTPHandler
 
 
@@ -19,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 def test(update: Update, context: CallbackContext, const=None) -> None:
     logger.info('Test Activated.')
-    pocket: Pocket = context.bot_data['pocket']
     test_keyboard = [
         [InlineKeyboardButton("1", callback_data='1'), InlineKeyboardButton("2", callback_data='2')],
         [InlineKeyboardButton("/testt", callback_data='/testt')]
@@ -27,13 +24,7 @@ def test(update: Update, context: CallbackContext, const=None) -> None:
     update.effective_message.reply_text('test :) ' + str(const), reply_markup=InlineKeyboardMarkup(test_keyboard))
 
 
-def init_bot_handlers(action: BaseAction, pocket: Pocket):
-    dispatcher = pocket.telegram_updater.dispatcher
-
-
 def init(pocket: Pocket):
-    pocket.reducer.register_handler(trigger=TelegramBotInitiated, callback=partial(init_bot_handlers, pocket=pocket))
-
     # pocket.store.dispatch(AddServerHandler('post', '/error', lambda s: print('hello')))
     pocket.store.dispatch(AddServerHandler('post', '/tasker/image/', test_post_handler))
     pocket.store.dispatch(AddServerHandler('get', '/index/', get_index))

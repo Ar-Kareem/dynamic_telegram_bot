@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from urllib import request
 from pathlib import Path
 import os
@@ -6,7 +7,7 @@ import json
 import math
 import time
 
-from telegram import Update, MessageEntity
+from telegram import Update, MessageEntity, Message
 from telegram.ext import CallbackContext
 
 from src.core.pocket import Pocket
@@ -72,7 +73,7 @@ def sync_database_telegram(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-        prev_msg = None
+        prev_msg: Optional[Message] = None
 
         def report_hook(msg: str, important: bool = False):
             nonlocal prev_msg
@@ -101,7 +102,6 @@ def _sync_database(url, target_dir, report_hook):
             return json.loads(r.read())
 
     target_dir.mkdir(exist_ok=True)
-    target_dir_files = os.listdir(target_dir)
     report_hook(f'Getting source PDF count from {url_counts}...', False)
     pdfs = url_get(url_counts)
     report_hook(f'Total pdf {len(pdfs)}', True)
@@ -119,7 +119,6 @@ def _sync_database(url, target_dir, report_hook):
         else:  # folder already exists and has content
             # need to check that folder content matches server otherwise desync
             cur_dir_files = os.listdir(cur_dir)
-            jpg_count = len([f for f in cur_dir_files if f.endswith('.jpg')])
             if output_pdf_name not in cur_dir_files:
                 report_hook(f'{pdf_id} DESYNC pdf doesnt exist', True)
             elif os.path.getsize(cur_dir / output_pdf_name) != cur_stats['size']:

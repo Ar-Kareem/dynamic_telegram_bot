@@ -42,4 +42,3 @@ def from_telegram(self: MyHTTPHandler):
     if t and (time.time() - self.pocket.get(__name__)['start_time']) < 5:
         self.response.append_data(bytes('<div>%s</div>' % t, "utf-8"))
     self.response.append_data(bytes("</body></html>", "utf-8"))
-

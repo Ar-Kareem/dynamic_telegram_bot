@@ -8,8 +8,7 @@ from typing import NamedTuple, Dict
 
 from src.core.actions import Terminate, AddServerHandler
 from src.core.pocket import Pocket
-from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server, HTTPResponse, \
-    InternalServerError
+from src.utils.simple_server.simple_server import MyHTTPHandler, start_server, close_server, InternalServerError
 
 logger = logging.getLogger(__name__)
 DICT_NAME = 'http_handler_dict'
@@ -108,7 +107,7 @@ class CustomHandler(MyHTTPHandler):
             self.capture_statistics(False)
             super().send_response(HTTPStatus.NOT_FOUND)
             super().end_headers()
-            logger.warning("No HTTP handler for %s: %s [from %s:%s]", method, path, *self.client_address[0:2])
+            logger.info("No HTTP handler for %s: %s [from %s:%s]", method, path, *self.client_address[0:2])
             return
 
         self.load_session()
@@ -118,11 +117,11 @@ class CustomHandler(MyHTTPHandler):
         except InternalServerError as e:
             self.response.set_response_code(e.status)
             self.response.set_data(e.user_message)
-            logger.warning('Internal server error. [from %s] [to %s]. Cause: %s',
-                           self.client_address[0], self.path, e.cause)
+            logger.info('Internal server error. [from %s] [to %s]. Cause: %s',
+                        self.client_address[0], self.path, e.cause)
             self.assign_response_data()
             return
-        except Exception as e:
+        except Exception:
             self.response.set_response_code(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.response.set_data(b'UNEXPECTED INTERNAL SERVER ERROR.')
             logger.exception('Unexpected exception when handling HTTP request [from %s] [to %s]',

@@ -3,7 +3,7 @@ from functools import partial
 from pathlib import Path
 
 from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext, Filters, MessageHandler
+from telegram.ext import CallbackContext, Filters, MessageHandler
 
 from src.core.actions import TelegramBotInitiated
 from src.core.pocket import Pocket

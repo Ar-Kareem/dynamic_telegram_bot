@@ -21,4 +21,3 @@ def serve_challenge(self: MyHTTPHandler):
     self.response.add_header('Content-type', 'application/notepad')
     self.response.add_header('Content-Disposition', 'attachment; filename="challenge.txt"')
     self.response.set_data(bytes(challenge, "utf-8"))
-

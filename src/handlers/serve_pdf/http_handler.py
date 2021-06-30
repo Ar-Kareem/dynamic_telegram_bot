@@ -26,7 +26,8 @@ def get_pdf_html_page(self: MyHTTPHandler):
     self.response.set_response_code(200)
     self.response.add_header("Content-type", "text/html")
 
-    prev_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num-1}" class="button green">Prev</a>' if page_num > 0 else ''
+    prev_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num-1}" class="button green">Prev</a>' \
+        if page_num > 0 else ''
     next_page_button = f'<a href="/pdf/page/{pdf_id}/{page_num+1}" class="button blue">Next</a>' \
         if page_num < helper.get_number_of_pages(pdf_id)-1 else ''
 
@@ -117,4 +118,3 @@ def get_database_status(self: MyHTTPHandler):
     self.response.set_response_code(200)
     self.response.add_header('Content-type', 'application/json')
     self.response.append_data(json.dumps(resp).encode('utf-8'))
-

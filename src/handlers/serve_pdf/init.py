@@ -38,4 +38,3 @@ def init_bot_handlers(action: BaseAction, pocket: Pocket):
     dispatcher = pocket.telegram_updater.dispatcher
     dispatcher.add_handler(CommandHandler("pdf", telegram_handler.pdf_request))
     dispatcher.add_handler(CommandHandler("pdfsync", telegram_handler.sync_database_telegram))
-
