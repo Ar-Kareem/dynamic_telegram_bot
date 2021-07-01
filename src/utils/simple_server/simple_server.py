@@ -172,6 +172,14 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         return morsel
 
 
+class _MyThreadingTCPServer(ThreadingTCPServer):
+    def handle_error(self, request, client_address):
+        """Handle an error in log instead of stderr."""
+        import traceback
+        last = traceback.format_exc(limit=1).splitlines()[-1]
+        logger.error('%s [from: %s]', last, client_address[0])
+
+
 def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None, localhost: bool = False,
                  port: int = 8049) -> ThreadingTCPServer:
     if hostname is None:
@@ -181,7 +189,7 @@ def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None, lo
             # don't used socket.gethostname(), will not work on wsl for some reason. '' is 0.0.0.0
             hostname = ''
 
-    webserver = ThreadingTCPServer((hostname, port), handler)
+    webserver = _MyThreadingTCPServer((hostname, port), handler)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
     thread.start()
