@@ -22,8 +22,15 @@ def init(pocket: Pocket):
     localhost = pocket.config.getboolean('SERVER', 'localhost', fallback=False)
     server_port = pocket.config.getint('SERVER', 'port', fallback=8049)
     use_ssl = pocket.config.getboolean('SERVER', 'SSL', fallback=False)
-    ssl_cert_key_paths = None
+    ssl_certs = None
     timeout = pocket.config.getfloat('SERVER', 'timeout', fallback=None)
+
+    pocket_ = pocket  # have to rename the variable before injecting (cant do pocket=pocket inside class)
+
+    class Handler(CustomHandler):
+        pocket = pocket_
+        sessionManager = SessionManager()
+
     if use_ssl:
         pem_files = pocket.database_dir / 'ssl' / 'pem_files'
         if not pem_files.exists():
@@ -33,17 +40,15 @@ def init(pocket: Pocket):
         pem_files = os.listdir(website_dir)
         full_chain = sorted([f for f in pem_files if f.startswith('fullchain')])[-1]
         private_key = sorted([f for f in pem_files if f.startswith('privkey')])[-1]
-        ssl_cert_key_paths = [website_dir / full_chain, website_dir / private_key]
+        ssl_certs = [website_dir / full_chain, website_dir / private_key]
 
-    pocket_to_inject = pocket  # have to rename the variable before injecting (cant do pocket=pocket inside class)
-
-    class Handler(CustomHandler):
-        pocket = pocket_to_inject
-        sessionManager = SessionManager()
+        from ssl import wrap_socket, PROTOCOL_TLSv1_2
+        # handler will call this function (if not None) on every request to wrap the socket and perform handshake
+        Handler.ssl_wrapper_func = lambda _, socket: wrap_socket(socket, certfile=ssl_certs[0], keyfile=ssl_certs[1],
+                                                                 server_side=True,  ssl_version=PROTOCOL_TLSv1_2)
 
     try:
-        http_server = start_server(Handler, localhost=localhost, port=server_port,
-                                   ssl_cert_key_paths=ssl_cert_key_paths, timeout=timeout)
+        http_server = start_server(Handler, localhost=localhost, port=server_port, timeout=timeout)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
         return

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 from http.cookies import SimpleCookie, Morsel
+from socketserver import ThreadingTCPServer
 from typing import List, Type, Union, Tuple
 from urllib.parse import quote
 import json
@@ -62,15 +63,21 @@ class HTTPResponse:
 
 
 class MyHTTPHandler(BaseHTTPRequestHandler):
-    pocket = None
     logger = None
     sessionManager = None
+    pocket = None
     session = None
 
-    def __init__(self, *args, **kwargs):
+    # performs ssl handshakes if needed
+    ssl_wrapper_func = None
+
+    def __init__(self, request, *args, **kwargs):
         self.path_split: List[str] = []
         self.response = HTTPResponse()
-        super().__init__(*args, **kwargs)
+        if self.ssl_wrapper_func is not None:
+            request = self.ssl_wrapper_func(request)
+
+        super().__init__(request, *args, **kwargs)
 
     def bind(self, func, as_name: str = None) -> None:
         """
@@ -161,8 +168,7 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
 
 
 def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None,
-                 localhost: bool = False, port: int = 8049,
-                 ssl_cert_key_paths: list = None, timeout: int = None) -> HTTPServer:
+                 localhost: bool = False, port: int = 8049, timeout: int = None) -> ThreadingTCPServer:
     if hostname is None:
         if localhost:
             hostname = 'localhost'
@@ -173,20 +179,14 @@ def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None,
     if timeout is not None:
         __set_timeout(timeout)
 
-    webserver = HTTPServer((hostname, port), handler)
-
-    if ssl_cert_key_paths is not None:
-        import ssl
-        webserver.socket = ssl.wrap_socket(webserver.socket,
-                                           certfile=ssl_cert_key_paths[0], keyfile=ssl_cert_key_paths[1],
-                                           server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
+    webserver = ThreadingTCPServer((hostname, port), handler)
     thread = threading.Thread(target=webserver.serve_forever)
     thread.daemon = True
     thread.start()
     return webserver
 
 
-def close_server(server: HTTPServer) -> None:
+def close_server(server: ThreadingTCPServer) -> None:
     server.shutdown()
     server.server_close()
 
@@ -207,8 +207,8 @@ def __set_timeout(timeout):
 def main():
     class Child(MyHTTPHandler):
         logger = type('l', (), {'info': print})()
-    # webserver = HTTPServer((socket.gethostname(), 8092), Child)
-    webserver = HTTPServer(('0.0.0.0', 8091), Child)
+    # webserver = ThreadingTCPServer((socket.gethostname(), 8092), Child)
+    webserver = ThreadingTCPServer(('0.0.0.0', 8091), Child)
     # import ssl
     # webserver.socket = ssl.wrap_socket(webserver.socket, server_side=True, certfile=_get_cert_path(),
     #                                    keyfile=__get_key_path(), ssl_version=ssl.PROTOCOL_TLSv1_2)
