@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.cookies import SimpleCookie, Morsel
 from socketserver import ThreadingTCPServer
 from typing import List, Type, Union, Tuple
@@ -8,7 +8,7 @@ from urllib.parse import quote
 import json
 import html
 import threading
-import socket
+from socket import SocketType
 import logging
 
 
@@ -68,16 +68,21 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
     pocket = None
     session = None
 
+    # connection/socket parameters
+    socket_timeout = None
     # performs ssl handshakes if needed
     ssl_wrapper_func = None
+    pre_ssl_socket_timeout = None
 
-    def __init__(self, request, *args, **kwargs):
+    def __init__(self, request_socket: SocketType, *args, **kwargs):
         self.path_split: List[str] = []
         self.response = HTTPResponse()
         if self.ssl_wrapper_func is not None:
-            request = self.ssl_wrapper_func(request)
+            request_socket.settimeout(self.pre_ssl_socket_timeout)
+            request_socket = self.ssl_wrapper_func(request_socket)
 
-        super().__init__(request, *args, **kwargs)
+        request_socket.settimeout(self.socket_timeout)
+        super().__init__(request_socket, *args, **kwargs)
 
     def bind(self, func, as_name: str = None) -> None:
         """
@@ -167,17 +172,14 @@ class MyHTTPHandler(BaseHTTPRequestHandler):
         return morsel
 
 
-def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None,
-                 localhost: bool = False, port: int = 8049, timeout: int = None) -> ThreadingTCPServer:
+def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None, localhost: bool = False,
+                 port: int = 8049) -> ThreadingTCPServer:
     if hostname is None:
         if localhost:
             hostname = 'localhost'
         else:
             # don't used socket.gethostname(), will not work on wsl for some reason. '' is 0.0.0.0
             hostname = ''
-
-    if timeout is not None:
-        __set_timeout(timeout)
 
     webserver = ThreadingTCPServer((hostname, port), handler)
     thread = threading.Thread(target=webserver.serve_forever)
@@ -189,19 +191,6 @@ def start_server(handler: Type[BaseHTTPRequestHandler], hostname: str = None,
 def close_server(server: ThreadingTCPServer) -> None:
     server.shutdown()
     server.server_close()
-
-
-# need to warn user if timeout is set multiple times since socket default timeout only supports single value overall
-__timeout_value = -999.25
-
-
-def __set_timeout(timeout):
-    socket.setdefaulttimeout(timeout)
-    global __timeout_value
-    if __timeout_value != -999.25 and __timeout_value != timeout:
-        logger.warning("timeout has been set multiple times. Overwriting and only taking latest value. "
-                       "(no support for multiple servers with different timeouts)")
-    __timeout_value = timeout
 
 
 def main():

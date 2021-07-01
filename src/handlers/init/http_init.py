@@ -24,12 +24,14 @@ def init(pocket: Pocket):
     use_ssl = pocket.config.getboolean('SERVER', 'SSL', fallback=False)
     ssl_certs = None
     timeout = pocket.config.getfloat('SERVER', 'timeout', fallback=None)
+    pre_ssl_timeout = pocket.config.getfloat('SERVER', 'pre_ssl_timeout', fallback=None)
 
     pocket_ = pocket  # have to rename the variable before injecting (cant do pocket=pocket inside class)
 
     class Handler(CustomHandler):
         pocket = pocket_
         sessionManager = SessionManager()
+        socket_timeout = timeout
 
     if use_ssl:
         pem_files = pocket.database_dir / 'ssl' / 'pem_files'
@@ -46,9 +48,10 @@ def init(pocket: Pocket):
         # handler will call this function (if not None) on every request to wrap the socket and perform handshake
         Handler.ssl_wrapper_func = lambda _, socket: wrap_socket(socket, certfile=ssl_certs[0], keyfile=ssl_certs[1],
                                                                  server_side=True,  ssl_version=PROTOCOL_TLSv1_2)
+        Handler.pre_ssl_socket_timeout = pre_ssl_timeout
 
     try:
-        http_server = start_server(Handler, localhost=localhost, port=server_port, timeout=timeout)
+        http_server = start_server(Handler, localhost=localhost, port=server_port)
     except Exception:
         logger.exception('Failed to start HTTP server at port %d', server_port)
         return
